@@ -7,23 +7,7 @@ https://adventofcode.com/2022/day/1
 ```elixir
 defmodule Load do
   def input do
-    # File.read!(Path.join(Path.absname(__DIR__), "input.txt"))
-    """
-    1000
-    2000
-    3000
-
-    4000
-
-    5000
-    6000
-
-    7000
-    8000
-    9000
-
-    10000
-    """
+    File.read!(Path.join(Path.absname(__DIR__), "input.txt"))
   end
 end
 ```
