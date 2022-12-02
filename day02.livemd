@@ -59,7 +59,7 @@ defmodule Part1 do
   end
 
   def winScore(theirs, mine) do
-    scores = %{
+    %{
       "A" => %{
         "X" => 3,
         "Y" => 6,
@@ -75,9 +75,7 @@ defmodule Part1 do
         "Y" => 0,
         "Z" => 3
       }
-    }
-
-    scores[theirs][mine]
+    }[theirs][mine]
   end
 
   def solve(input) do
