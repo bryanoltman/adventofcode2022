@@ -1,0 +1,55 @@
+# Day 1
+
+## Load Input
+
+https://adventofcode.com/2022/day/1
+
+```elixir
+defmodule Load do
+  def input do
+    File.read!(Path.join(Path.absname(__DIR__), "input/01.txt"))
+  end
+end
+```
+
+```elixir
+defmodule Parse do
+  def parseInput(input) do
+    input
+    |> String.split("\n\n", trim: false)
+    |> Enum.map(fn group ->
+      group
+      |> String.split("\n", trim: true)
+      |> Enum.map(&String.to_integer/1)
+      |> Enum.sum()
+    end)
+  end
+end
+```
+
+```elixir
+defmodule Part1 do
+  def solve do
+    Load.input()
+    |> Parse.parseInput()
+    |> Enum.sort(:desc)
+    |> Enum.take(1)
+  end
+end
+
+Part1.solve()
+```
+
+```elixir
+defmodule Part2 do
+  def solve do
+    Load.input()
+    |> Parse.parseInput()
+    |> Enum.sort(:desc)
+    |> Enum.take(3)
+    |> Enum.sum()
+  end
+end
+
+Part2.solve()
+```
