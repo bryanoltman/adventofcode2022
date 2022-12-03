@@ -95,8 +95,8 @@ defmodule Part1 do
     |> Enum.map(fn string ->
       string
       |> halveString
-      |> Part1.overlappingCharacter()
-      |> Part1.pointForCharacter()
+      |> overlappingCharacter
+      |> pointForCharacter
     end)
     |> Enum.sum()
   end
@@ -140,7 +140,7 @@ defmodule Part2 do
     |> Enum.chunk_every(3)
     |> Enum.map(fn chunk ->
       chunk
-      |> Part2.commonCharacter()
+      |> commonCharacter
       |> Part1.pointForCharacter()
     end)
     |> Enum.sum()
