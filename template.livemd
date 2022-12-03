@@ -1,0 +1,69 @@
+# Day X
+
+## Setup
+
+https://adventofcode.com/2022/day/X
+
+```elixir
+defmodule Load do
+  def input do
+    File.read!(Path.join(Path.absname(__DIR__), "input/02.txt"))
+  end
+end
+```
+
+```elixir
+defmodule Parse do
+  def input(inputString) do
+    inputString
+    |> String.split("\n", trim: true)
+  end
+end
+```
+
+```elixir
+realInput =
+  Load.input()
+  |> Parse.input()
+```
+
+```elixir
+testInput =
+  """
+  """
+  |> Parse.input()
+```
+
+## Part 1
+
+DESCRIPTION
+
+```elixir
+defmodule Part1 do
+  def solve(input) do
+  end
+end
+
+Part1.solve(testInput)
+```
+
+```elixir
+Part1.solve(realInput)
+```
+
+## Part 2
+
+DESCRIPTION
+
+```elixir
+defmodule Part2 do
+  def solve(input) do
+  end
+end
+
+Part2.solve(testInput)
+```
+
+```elixir
+Part2.solve(realInput)
+```
