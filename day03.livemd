@@ -92,9 +92,12 @@ defmodule Part1 do
 
   def solve(input) do
     input
-    |> Enum.map(&halveString(&1))
-    |> Enum.map(&Part1.overlappingCharacter(&1))
-    |> Enum.map(&Part1.pointForCharacter(&1))
+    |> Enum.map(fn string ->
+      string
+      |> halveString
+      |> Part1.overlappingCharacter()
+      |> Part1.pointForCharacter()
+    end)
     |> Enum.sum()
   end
 end
@@ -135,8 +138,11 @@ defmodule Part2 do
   def solve(input) do
     input
     |> Enum.chunk_every(3)
-    |> Enum.map(&Part2.commonCharacter(&1))
-    |> Enum.map(&Part1.pointForCharacter(&1))
+    |> Enum.map(fn chunk ->
+      chunk
+      |> Part2.commonCharacter()
+      |> Part1.pointForCharacter()
+    end)
     |> Enum.sum()
   end
 end
