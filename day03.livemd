@@ -1,4 +1,4 @@
-# Day X
+# Day 3
 
 ## Setup
 
