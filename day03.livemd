@@ -1,0 +1,149 @@
+# Day X
+
+## Setup
+
+https://adventofcode.com/2022/day/3
+
+```elixir
+defmodule Load do
+  def input do
+    File.read!(Path.join(Path.absname(__DIR__), "input/03.txt"))
+  end
+end
+```
+
+```elixir
+defmodule Parse do
+  def input(inputString) do
+    inputString
+    |> String.split("\n", trim: true)
+  end
+end
+```
+
+```elixir
+realInput =
+  Load.input()
+  |> Parse.input()
+```
+
+```elixir
+testInput =
+  """
+  vJrwpWtwJgWrhcsFMMfFFhFp
+  jqHRNqRjqzjGDLGLrsFMfFZSrLrFZsSL
+  PmmdzqPrVvPwwTWBwg
+  wMqvLMZHhHMvwLHjbvcjnnSBnvTQFn
+  ttgJtRGJQctTZtZT
+  CrZsJsPPZsGzwwsLwLmpwMDw
+  """
+  |> Parse.input()
+```
+
+## Part 1
+
+One Elf has the important job of loading all of the rucksacks with supplies for the jungle journey. Unfortunately, that Elf didn't quite follow the packing instructions, and so a few items now need to be rearranged.
+
+Each rucksack has two large compartments. All items of a given type are meant to go into exactly one of the two compartments. The Elf that did the packing failed to follow this rule for exactly one item type per rucksack.
+
+The Elves have made a list of all of the items currently in each rucksack (your puzzle input), but they need your help finding the errors. Every item type is identified by a single lowercase or uppercase letter (that is, a and A refer to different types of items).
+
+The list of items for each rucksack is given as characters all on a single line. A given rucksack always has the same number of items in each of its two compartments, so the first half of the characters represent items in the first compartment, while the second half of the characters represent items in the second compartment.
+
+To help prioritize item rearrangement, every item type can be converted to a priority:
+
+Lowercase item types a through z have priorities 1 through 26.
+Uppercase item types A through Z have priorities 27 through 52.
+
+```elixir
+defmodule Part1 do
+  def halveString(string) do
+    halfStringLength = div(String.length(string), 2)
+
+    string
+    |> String.graphemes()
+    |> Enum.chunk_every(halfStringLength)
+    |> Enum.map(&MapSet.new(&1))
+    |> List.to_tuple()
+  end
+
+  # Assumes (as per instructions) that there is exactly one character shared between sets
+  def overlappingCharacter({setA, setB}) do
+    MapSet.intersection(setA, setB)
+    |> MapSet.to_list()
+    |> hd
+    |> String.to_charlist()
+    |> hd
+  end
+
+  # Uppercase
+  # ASCII values are 65 -> 90 for uppercase letters
+  # Uppercase item types A through Z have priorities 27 through 52.
+  def pointForCharacter(character) when character >= 65 and character <= 90 do
+    character - 38
+  end
+
+  # Lowercase
+  # ASCII values are 97 -> 122 for uppercase letters
+  # Lowercase item types a through z have priorities 1 through 26.
+  def pointForCharacter(character) when character >= 97 and character <= 122 do
+    character - 96
+  end
+
+  def solve(input) do
+    input
+    |> Enum.map(&halveString(&1))
+    |> Enum.map(&Part1.overlappingCharacter(&1))
+    |> Enum.map(&Part1.pointForCharacter(&1))
+    |> Enum.sum()
+  end
+end
+
+Part1.solve(testInput)
+```
+
+```elixir
+Part1.solve(realInput)
+```
+
+## Part 2
+
+For safety, the Elves are divided into groups of three. Every Elf carries a badge that identifies their group. For efficiency, within each group of three Elves, the badge is the only item type carried by all three Elves. That is, if a group's badge is item type B, then all three Elves will have item type B somewhere in their rucksack, and at most two of the Elves will be carrying any other item type.
+
+The problem is that someone forgot to put this year's updated authenticity sticker on the badges. All of the badges need to be pulled out of the rucksacks so the new authenticity stickers can be attached.
+
+Additionally, nobody wrote down which item type corresponds to each group's badges. The only way to tell which item type is the right one is by finding the one item type that is common between all three Elves in each group.
+
+Every set of three lines in your list corresponds to a single group, but each group can have a different badge item type. So, in the above example, the first group's rucksacks are the first three lines:
+
+```elixir
+defmodule Part2 do
+  # Given a list of strings, return the single character that exists in all three
+  def commonCharacter(inputs) do
+    sets =
+      inputs
+      |> Enum.map(&String.graphemes(&1))
+      |> Enum.map(&MapSet.new(&1))
+
+    Enum.reduce(sets, hd(sets), fn set, acc -> MapSet.intersection(set, acc) end)
+    |> MapSet.to_list()
+    |> hd
+    |> String.to_charlist()
+    |> hd
+  end
+
+  def solve(input) do
+    input
+    |> Enum.chunk_every(3)
+    |> Enum.map(&Part2.commonCharacter(&1))
+    |> Enum.map(&Part1.pointForCharacter(&1))
+    |> Enum.sum()
+  end
+end
+
+Part2.solve(testInput)
+```
+
+```elixir
+Part2.solve(realInput)
+```
