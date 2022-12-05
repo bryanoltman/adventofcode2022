@@ -1,13 +1,13 @@
-# Day X
+# Day XX
 
 ## Setup
 
-https://adventofcode.com/2022/day/X
+https://adventofcode.com/2022/day/XX
 
 ```elixir
 defmodule Load do
   def input do
-    File.read!(Path.join(Path.absname(__DIR__), "input/02.txt"))
+    File.read!(Path.join(Path.absname(__DIR__), "input/XX.txt"))
   end
 end
 ```
