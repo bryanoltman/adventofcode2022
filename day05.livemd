@@ -1,0 +1,139 @@
+# Day 05
+
+## Setup
+
+https://adventofcode.com/2022/day/05
+
+```elixir
+defmodule Load do
+  def input do
+    File.read!(Path.join(Path.absname(__DIR__), "input/05.txt"))
+  end
+end
+```
+
+```elixir
+defmodule Parse do
+  def input(string) do
+    {_, instructions} =
+      string
+      |> String.split("\n\n")
+      |> Enum.map(&String.split(&1, "\n", trim: true))
+      |> List.to_tuple()
+
+    {%{}, instructions}
+  end
+end
+```
+
+```elixir
+{_, instructions} =
+  """
+      [D]    
+  [N] [C]    
+  [Z] [M] [P]
+  1   2   3 
+
+  move 1 from 2 to 1
+  move 3 from 1 to 3
+  move 2 from 2 to 1
+  move 1 from 1 to 2
+  """
+  |> Parse.input()
+
+testInput = {
+  %{
+    "1" => ["Z", "N"],
+    "2" => ["M", "C", "D"],
+    "3" => ["P"]
+  },
+  instructions
+}
+```
+
+```elixir
+{_, instructions} =
+  Load.input()
+  |> Parse.input()
+
+realInput = {
+  %{
+    "1" => ["R", "S", "L", "F", "Q"],
+    "2" => ["N", "Z", "Q", "G", "P", "T"],
+    "3" => ["S", "M", "Q", "B"],
+    "4" => ["T", "G", "Z", "J", "H", "C", "B", "Q"],
+    "5" => ["P", "H", "M", "B", "N", "F", "S"],
+    "6" => ["P", "C", "Q", "N", "S", "L", "V", "G"],
+    "7" => ["W", "C", "F"],
+    "8" => ["Q", "H", "G", "Z", "W", "V", "P", "M"],
+    "9" => ["G", "Z", "D", "L", "C", "N", "R"]
+  },
+  instructions
+}
+```
+
+## Part 1
+
+DESCRIPTION
+
+```elixir
+defmodule Part1 do
+  def solve({stacks, instructions}) do
+    instructions
+    |> Enum.reduce(stacks, fn instruction, acc ->
+      [_, countStr, _, source, _, dest] = String.split(instruction, " ", trim: true)
+      {count, _} = Integer.parse(countStr)
+      source_stack = acc[source]
+      dest_stack = acc[dest]
+
+      {remaining, to_move} = Enum.split(source_stack, Enum.count(source_stack) - count)
+      dest_stack = dest_stack ++ Enum.reverse(to_move)
+
+      acc
+      |> Map.replace!(source, remaining)
+      |> Map.replace!(dest, dest_stack)
+    end)
+    |> Enum.map(fn {_, v} -> Enum.at(v, -1) end)
+    |> Enum.join("")
+  end
+end
+
+Part1.solve(testInput)
+```
+
+```elixir
+Part1.solve(realInput)
+```
+
+## Part 2
+
+DESCRIPTION
+
+```elixir
+defmodule Part2 do
+  def solve({stacks, instructions}) do
+    instructions
+    |> Enum.reduce(stacks, fn instruction, acc ->
+      [_, countStr, _, source, _, dest] = String.split(instruction, " ", trim: true)
+      {count, _} = Integer.parse(countStr)
+      source_stack = acc[source]
+      dest_stack = acc[dest]
+
+      {remaining, to_move} = Enum.split(source_stack, Enum.count(source_stack) - count)
+      dest_stack = dest_stack ++ to_move
+
+      acc
+      |> Map.replace!(source, remaining)
+      |> Map.replace!(dest, dest_stack)
+    end)
+    |> Enum.map(fn {_, v} -> Enum.at(v, -1) end)
+    |> Enum.join("")
+  end
+end
+
+Part2.solve(testInput)
+```
+
+```elixir
+Part2.solve(realInput)
+```
