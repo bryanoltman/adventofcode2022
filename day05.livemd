@@ -34,7 +34,9 @@ defmodule Parse do
       end)
       |> Enum.zip()
       |> Enum.map(fn tuple ->
-        Enum.map(Tuple.to_list(tuple), fn item -> List.to_string([item]) end)
+        Enum.map(Tuple.to_list(tuple), fn item ->
+          List.to_string([item])
+        end)
       end)
       |> Enum.map(&Enum.filter(&1, fn str -> String.trim(str) != "" end))
 
