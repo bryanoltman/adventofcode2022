@@ -1,0 +1,250 @@
+# Day 07
+
+## Support
+
+```elixir
+defmodule AOCDirectory do
+  defstruct name: "", tag: 0
+end
+
+defmodule AOCFile do
+  defstruct name: "", size: 0
+end
+
+defmodule FileDirUtils do
+  def subdir_with_name(tree, vertex, name) do
+    :digraph.out_neighbours(tree, vertex)
+    |> Enum.find(fn v ->
+      %v_type{} = v
+      v.name == name and v_type == AOCDirectory
+    end)
+  end
+
+  def parent_dir(tree, vertex) do
+    :digraph.in_neighbours(tree, vertex)
+    |> List.first()
+  end
+end
+
+defmodule FileDirUtilsTest do
+  def test_subdir_with_name do
+    tree = :digraph.new()
+    a_vertex = :digraph.add_vertex(tree, %AOCDirectory{name: "a"})
+    :digraph.add_vertex(tree, %AOCDirectory{name: "b"})
+    :digraph.add_vertex(tree, %AOCDirectory{name: "c"})
+    :digraph.add_vertex(tree, %AOCDirectory{name: "d"})
+    :digraph.add_edge(tree, a_vertex, %AOCDirectory{name: "b"})
+    :digraph.add_edge(tree, a_vertex, %AOCDirectory{name: "c"})
+    :digraph.add_edge(tree, a_vertex, %AOCDirectory{name: "d"})
+
+    FileDirUtils.subdir_with_name(tree, a_vertex, "b")
+  end
+
+  def test_parent_dir do
+    tree = :digraph.new()
+    a_vertex = :digraph.add_vertex(tree, %AOCDirectory{name: "a", tag: 1})
+    b_vertex = :digraph.add_vertex(tree, %AOCDirectory{name: "b", tag: 2})
+    c_vertex = :digraph.add_vertex(tree, %AOCDirectory{name: "c", tag: 3})
+    d_vertex = :digraph.add_vertex(tree, %AOCDirectory{name: "b", tag: 4})
+    :digraph.add_edge(tree, a_vertex, b_vertex)
+    :digraph.add_edge(tree, b_vertex, c_vertex)
+    :digraph.add_edge(tree, c_vertex, d_vertex)
+
+    FileDirUtils.parent_dir(tree, d_vertex)
+  end
+end
+
+FileDirUtilsTest.test_subdir_with_name()
+# FileDirUtilsTest.test_parent_dir()
+```
+
+## Setup
+
+https://adventofcode.com/2022/day/07
+
+```elixir
+defmodule Load do
+  def input do
+    File.read!(Path.join(Path.absname(__DIR__), "input/07.txt"))
+  end
+end
+```
+
+```elixir
+defmodule Parse do
+  def dir_string(dir) do
+    tag = Integer.to_string(dir.tag)
+    dir.name <> " (" <> tag <> ")"
+  end
+
+  def create_tree_recursive(tree, _, [], _) do
+    tree
+  end
+
+  def create_tree_recursive(tree, current_vertex, [command | commands], tag) do
+    case command do
+      "$ ls" ->
+        create_tree_recursive(tree, current_vertex, commands, tag)
+
+      "$ cd /" ->
+        {root_dir, _} = :digraph.vertex(tree, %AOCDirectory{name: "/"})
+        create_tree_recursive(tree, root_dir, commands, tag)
+
+      "$ cd .." ->
+        parent = FileDirUtils.parent_dir(tree, current_vertex)
+        create_tree_recursive(tree, parent, commands, tag)
+
+      "$ cd " <> dir_name ->
+        target_vertex = FileDirUtils.subdir_with_name(tree, current_vertex, dir_name)
+        create_tree_recursive(tree, target_vertex, commands, tag + 1)
+
+      "dir " <> dir_name ->
+        case FileDirUtils.subdir_with_name(tree, current_vertex, dir_name) do
+          nil ->
+            new_vertex = :digraph.add_vertex(tree, %AOCDirectory{name: dir_name, tag: tag})
+            :digraph.add_edge(tree, current_vertex, new_vertex)
+
+          _ ->
+            {}
+        end
+
+        create_tree_recursive(tree, current_vertex, commands, tag + 1)
+
+      file_line ->
+        [size_str, name] = String.split(file_line, " ")
+        {size, _} = Integer.parse(size_str)
+        file = %AOCFile{name: name, size: size}
+        new_vertex = :digraph.add_vertex(tree, file)
+        :digraph.add_edge(tree, current_vertex, new_vertex)
+        create_tree_recursive(tree, current_vertex, commands, tag)
+    end
+  end
+
+  def input(inputString) do
+    dir_tree = :digraph.new()
+    root_dir = :digraph.add_vertex(dir_tree, %AOCDirectory{name: "/", tag: 0})
+
+    input_lines =
+      inputString
+      |> String.split("\n", trim: true)
+
+    create_tree_recursive(dir_tree, root_dir, input_lines, 0)
+  end
+end
+
+testInput =
+  """
+  $ cd /
+  $ ls
+  dir a
+  14848514 b.txt
+  8504156 c.dat
+  dir d
+  $ cd a
+  $ ls
+  dir e
+  29116 f
+  2557 g
+  62596 h.lst
+  $ cd e
+  $ ls
+  584 i
+  $ cd ..
+  $ cd ..
+  $ cd d
+  $ ls
+  4060174 j
+  8033020 d.log
+  5626152 d.ext
+  7214296 k
+  """
+  |> Parse.input()
+```
+
+```elixir
+realInput =
+  Load.input()
+  |> Parse.input()
+```
+
+## Part 1
+
+```elixir
+defmodule Part1 do
+  def all_file_descendents(tree, current_dir) do
+    Enum.map(:digraph.out_neighbours(tree, current_dir), fn
+      %AOCFile{} = file ->
+        [file]
+
+      %AOCDirectory{} = dir ->
+        all_file_descendents(tree, dir)
+    end)
+    |> List.flatten()
+  end
+
+  def all_files_size(tree, current_dir) do
+    all_file_descendents(tree, current_dir)
+    |> Enum.map(fn v -> v.size end)
+    |> Enum.sum()
+  end
+
+  def solve(input) do
+    :digraph.vertices(input)
+    |> Enum.filter(fn v ->
+      %v_type{} = v
+      v_type == AOCDirectory
+    end)
+    |> Enum.map(fn v ->
+      {v.name, all_files_size(input, v)}
+    end)
+    # all_file_descendents(input, root_dir)
+    |> Enum.filter(fn {_, size} ->
+      size <= 100_000
+    end)
+    |> Enum.map(fn {_, size} -> size end)
+    |> Enum.sum()
+  end
+end
+
+Part1.solve(testInput)
+```
+
+```elixir
+Part1.solve(realInput)
+```
+
+## Part 2
+
+```elixir
+defmodule Part2 do
+  def solve(input) do
+    total_space = 70_000_000
+    unused_space_needed = 30_000_000
+
+    {root_dir, _} = :digraph.vertex(input, %AOCDirectory{name: "/", tag: 0})
+    used_space = Part1.all_files_size(input, root_dir)
+    free_space = total_space - used_space
+    space_to_free = unused_space_needed - free_space
+
+    :digraph.vertices(input)
+    |> Enum.filter(fn v ->
+      %v_type{} = v
+      v_type == AOCDirectory
+    end)
+    |> Enum.map(fn v ->
+      {v.name, Part1.all_files_size(input, v)}
+    end)
+    |> Enum.filter(fn {_, size} ->
+      size >= space_to_free
+    end)
+    |> Enum.map(fn {_, size} -> size end)
+    |> Enum.min()
+  end
+end
+
+Part2.solve(testInput)
+```
+
+```elixir
+Part2.solve(realInput)
+```
