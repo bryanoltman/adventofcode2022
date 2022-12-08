@@ -1,0 +1,293 @@
+# Day 08
+
+## Setup
+
+https://adventofcode.com/2022/day/08
+
+```elixir
+defmodule Load do
+  def input do
+    File.read!(Path.join(Path.absname(__DIR__), "input/08.txt"))
+  end
+end
+```
+
+```elixir
+# Taken from https://blog.danielberkompas.com/2016/04/23/multidimensional-arrays-in-elixir/
+defmodule Matrix do
+  @moduledoc """
+  Helpers for working with multidimensional lists, also called matrices.
+  """
+
+  @doc """
+  Converts a multidimensional list into a zero-indexed map.
+
+  ## Example
+
+      iex> list = [["x", "o", "x"]]
+      ...> Matrix.from_list(list)
+      %{0 => %{0 => "x", 1 => "o", 2 => "x"}}
+  """
+  def from_list(list) when is_list(list) do
+    do_from_list(list)
+  end
+
+  defp do_from_list(list, map \\ %{}, index \\ 0)
+  defp do_from_list([], map, _index), do: map
+
+  defp do_from_list([h | t], map, index) do
+    map = Map.put(map, index, do_from_list(h))
+    do_from_list(t, map, index + 1)
+  end
+
+  defp do_from_list(other, _, _), do: other
+
+  @doc """
+  Converts a zero-indexed map into a multidimensional list.
+
+  ## Example
+
+      iex> matrix = %{0 => %{0 => "x", 1 => "o", 2 => "x"}}
+      ...> Matrix.to_list(matrix)
+      [["x", "o", "x"]]
+  """
+  def to_list(matrix) when is_map(matrix) do
+    do_to_list(matrix)
+  end
+
+  defp do_to_list(matrix) when is_map(matrix) do
+    for {_index, value} <- matrix,
+        into: [],
+        do: do_to_list(value)
+  end
+
+  defp do_to_list(other), do: other
+end
+```
+
+```elixir
+defmodule Parse do
+  def input(inputString) do
+    inputString
+    |> String.split("\n", trim: true)
+    |> Enum.map(fn row ->
+      row
+      |> String.split("", trim: true)
+      |> Enum.map(&elem(Integer.parse(&1), 0))
+    end)
+    |> Matrix.from_list()
+  end
+end
+
+testInput =
+  """
+  30373
+  25512
+  65332
+  33549
+  35390
+  """
+  |> Parse.input()
+```
+
+```elixir
+realInput =
+  Load.input()
+  |> Parse.input()
+```
+
+## Part 1
+
+```elixir
+defmodule Part1 do
+  def is_visible_from_top_or_bottom(matrix, x, y) do
+    tree_height = matrix[y][x]
+
+    matrix_height = Enum.count(matrix)
+
+    case y do
+      y when y == 0 ->
+        true
+
+      y when y == matrix_height - 1 ->
+        true
+
+      y ->
+        visible_from_top =
+          0..(y - 1)
+          |> Enum.map(fn yPos -> matrix[yPos][x] end)
+          |> Enum.all?(fn height -> height < tree_height end)
+
+        visible_from_bottom =
+          (y + 1)..(matrix_height - 1)
+          |> Enum.map(fn yPos -> matrix[yPos][x] end)
+          |> Enum.all?(fn height -> height < tree_height end)
+
+        visible_from_top or visible_from_bottom
+    end
+  end
+
+  def is_visible_from_side(matrix, x, y) do
+    tree_height = matrix[y][x]
+
+    matrix_width = Enum.count(matrix[0])
+
+    case x do
+      x when x == 0 ->
+        true
+
+      x when x == matrix_width - 1 ->
+        true
+
+      x ->
+        visible_from_left =
+          0..(x - 1)
+          |> Enum.map(fn xPos -> matrix[y][xPos] end)
+          |> Enum.all?(fn height -> height < tree_height end)
+
+        visible_from_right =
+          (x + 1)..(matrix_width - 1)
+          |> Enum.map(fn xPos -> matrix[y][xPos] end)
+          |> Enum.all?(fn height -> height < tree_height end)
+
+        visible_from_left or visible_from_right
+    end
+  end
+
+  def is_visible(grid, x, y) do
+    is_visible_from_side(grid, x, y) or
+      is_visible_from_top_or_bottom(grid, x, y)
+  end
+
+  def solve(grid) do
+    grid_height = Enum.count(grid)
+    grid_width = Enum.count(grid[0])
+
+    0..(grid_height - 1)
+    |> Enum.map(fn yPos ->
+      0..(grid_width - 1)
+      |> Enum.map(fn xPos ->
+        is_visible(grid, xPos, yPos)
+      end)
+    end)
+    |> List.flatten()
+    |> Enum.count(fn bool -> bool end)
+  end
+end
+
+Part1.solve(testInput)
+```
+
+```elixir
+Part1.solve(realInput)
+```
+
+## Part 2
+
+```elixir
+defmodule Part2 do
+  def left_distance_visible(grid, x, y) do
+    case x do
+      x when x == 0 ->
+        0
+
+      x ->
+        trees =
+          0..(x - 1)
+          |> Enum.map(fn xPos -> grid[y][xPos] end)
+          |> Enum.reverse()
+
+        visible_distance(grid[y][x], trees, x)
+    end
+  end
+
+  def right_distance_visible(grid, x, y) do
+    grid_width = Enum.count(grid[0])
+
+    case x do
+      x when x == grid_width - 1 ->
+        0
+
+      x ->
+        trees =
+          (x + 1)..(grid_width - 1)
+          |> Enum.map(fn xPos -> grid[y][xPos] end)
+
+        visible_distance(grid[y][x], trees, grid_width - 1 - x)
+    end
+  end
+
+  def top_distance_visible(grid, x, y) do
+    case y do
+      y when y == 0 ->
+        0
+
+      y ->
+        trees =
+          0..(y - 1)
+          |> Enum.map(fn yPos -> grid[yPos][x] end)
+          |> Enum.reverse()
+
+        visible_distance(grid[y][x], trees, y)
+    end
+  end
+
+  def bottom_distance_visible(grid, x, y) do
+    grid_height = Enum.count(grid)
+
+    case y do
+      y when y == grid_height - 1 ->
+        0
+
+      y ->
+        trees =
+          (y + 1)..(grid_height - 1)
+          |> Enum.map(fn yPos -> grid[yPos][x] end)
+
+        visible_distance(grid[y][x], trees, grid_height - 1 - y)
+    end
+  end
+
+  def visible_distance(tree_height, trees, max_distance) do
+    distance =
+      trees
+      |> Enum.take_while(fn height -> height < tree_height end)
+      |> Enum.count()
+
+    case distance do
+      # we reached the edge
+      distance when distance == max_distance -> distance
+      # account for the blocking tree
+      distance -> distance + 1
+    end
+  end
+
+  def scenic_score(grid, x, y) do
+    top_distance_visible(grid, x, y) *
+      left_distance_visible(grid, x, y) *
+      right_distance_visible(grid, x, y) *
+      bottom_distance_visible(grid, x, y)
+  end
+
+  def solve(grid) do
+    grid_height = Enum.count(grid)
+    grid_width = Enum.count(grid[0])
+
+    0..(grid_height - 1)
+    |> Enum.map(fn yPos ->
+      0..(grid_width - 1)
+      |> Enum.map(fn xPos ->
+        scenic_score(grid, xPos, yPos)
+      end)
+    end)
+    |> List.flatten()
+    |> Enum.max()
+  end
+end
+
+Part2.solve(testInput)
+```
+
+```elixir
+Part2.solve(realInput)
+```
