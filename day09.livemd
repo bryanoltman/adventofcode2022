@@ -1,0 +1,242 @@
+# Day 9
+
+## Setup
+
+https://adventofcode.com/2022/day/09
+
+```elixir
+defmodule Load do
+  def input do
+    File.read!(Path.join(Path.absname(__DIR__), "input/09x.txt"))
+  end
+end
+```
+
+```elixir
+defmodule Point do
+  defstruct x: 0, y: 0
+end
+
+defmodule Rope do
+  defstruct head: %Point{}, tail: %Point{}
+end
+```
+
+```elixir
+defmodule Parse do
+  def input(inputString) do
+    inputString
+    |> String.split("\n", trim: true)
+    |> Enum.map(fn line ->
+      {direction, count_str} =
+        line
+        |> String.split(" ")
+        |> List.to_tuple()
+
+      {direction, elem(Integer.parse(count_str), 0)}
+    end)
+  end
+end
+
+testInput =
+  """
+  R 4
+  U 4
+  L 3
+  D 1
+  R 4
+  D 1
+  L 5
+  R 2
+  """
+  |> Parse.input()
+```
+
+```elixir
+realInput =
+  Load.input()
+  |> Parse.input()
+```
+
+## Part 1
+
+```elixir
+defmodule Part1 do
+  def points_adjacent?(%Point{x: x1, y: y1}, %Point{x: x2, y: y2}) do
+    Enum.member?((x1 - 1)..(x1 + 1), x2) and
+      Enum.member?((y1 - 1)..(y1 + 1), y2)
+  end
+
+  # If tail and new_head are adjacent, tail doesn't need to change
+  def tail_position(tail, new_head)
+      when abs(new_head.x - tail.x) <= 1 and abs(new_head.y - tail.y) <= 1 do
+    tail
+  end
+
+  # If tail and new_head are _not_ adjacent, we need to move tail
+  def tail_position(tail, new_head) do
+    x_diff = new_head.x - tail.x
+    y_diff = new_head.y - tail.y
+
+    new_x =
+      cond do
+        x_diff > 1 -> new_head.x - 1
+        x_diff < -1 -> new_head.x + 1
+        true -> new_head.x
+      end
+
+    new_y =
+      cond do
+        y_diff > 1 -> new_head.y - 1
+        y_diff < -1 -> new_head.y + 1
+        true -> new_head.y
+      end
+
+    %Point{x: new_x, y: new_y}
+  end
+
+  def move(_, 0, positions) do
+    positions
+  end
+
+  def move(direction, count, [position | positions]) do
+    head = position.head
+    tail = position.tail
+
+    new_head =
+      case direction do
+        "R" ->
+          %Point{x: head.x + 1, y: head.y}
+
+        "L" ->
+          %Point{x: head.x - 1, y: head.y}
+
+        "U" ->
+          %Point{x: head.x, y: head.y - 1}
+
+        "D" ->
+          %Point{x: head.x, y: head.y + 1}
+      end
+
+    new_tail = tail_position(tail, new_head)
+
+    move(
+      direction,
+      count - 1,
+      [%Rope{head: new_head, tail: new_tail}] ++ [position] ++ positions
+    )
+  end
+
+  def solve(moves) do
+    starting_rope = %Rope{
+      head: %Point{x: 0, y: 0},
+      tail: %Point{x: 0, y: 0}
+    }
+
+    Enum.reduce(moves, [starting_rope], fn {direction, count}, current_pos ->
+      move(direction, count, current_pos)
+    end)
+    |> Enum.reverse()
+    |> Enum.map(fn rope -> rope.tail end)
+    |> MapSet.new()
+    |> Enum.count()
+  end
+end
+
+Part1.solve(testInput)
+```
+
+```elixir
+Part1.solve(realInput)
+```
+
+## Part 2
+
+```elixir
+defmodule Rope2 do
+  defstruct head: %Point{}, tails: []
+end
+```
+
+```elixir
+test_input_2 =
+  """
+  R 5
+  U 8
+  L 8
+  D 3
+  R 17
+  D 10
+  L 25
+  U 20
+  """
+  |> Parse.input()
+```
+
+```elixir
+defmodule Part2 do
+  def move(_, 0, positions) do
+    positions
+  end
+
+  def move(direction, count, [position | positions]) do
+    head = position.head
+
+    new_head =
+      case direction do
+        "R" ->
+          %Point{x: head.x + 1, y: head.y}
+
+        "L" ->
+          %Point{x: head.x - 1, y: head.y}
+
+        "U" ->
+          %Point{x: head.x, y: head.y - 1}
+
+        "D" ->
+          %Point{x: head.x, y: head.y + 1}
+      end
+
+    new_tails =
+      position.tails
+      |> Enum.reduce([], fn tail, knots ->
+        asdf =
+          if Enum.count(knots) == 0 do
+            new_head
+          else
+            hd(knots)
+          end
+
+        [Part1.tail_position(tail, asdf)] ++ knots
+      end)
+      |> Enum.reverse()
+
+    move(
+      direction,
+      count - 1,
+      [%Rope2{head: new_head, tails: new_tails}] ++ [position] ++ positions
+    )
+  end
+
+  def solve(moves) do
+    starting_rope = %Rope2{
+      head: %Point{},
+      tails: 1..9 |> Enum.map(fn _ -> %Point{} end)
+    }
+
+    Enum.reduce(moves, [starting_rope], fn {direction, count}, current_pos ->
+      move(direction, count, current_pos)
+    end)
+    |> Enum.reverse()
+    |> Enum.map(fn rope -> List.last(rope.tails) end)
+    |> MapSet.new()
+    |> Enum.count()
+  end
+end
+
+Part2.solve(test_input_2)
+```
+
+```elixir
+Part2.solve(realInput)
+```
