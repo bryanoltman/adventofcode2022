@@ -36,8 +36,6 @@ testInput =
 
 ## Part 1
 
-DESCRIPTION
-
 ```elixir
 defmodule Part1 do
   def solve(input) do
@@ -52,8 +50,6 @@ Part1.solve(realInput)
 ```
 
 ## Part 2
-
-DESCRIPTION
 
 ```elixir
 defmodule Part2 do
