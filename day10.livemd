@@ -1,0 +1,297 @@
+# Day 10
+
+## Setup
+
+https://adventofcode.com/2022/day/10
+
+```elixir
+test_input_str = """
+  addx 15
+  addx -11
+  addx 6
+  addx -3
+  addx 5
+  addx -1
+  addx -8
+  addx 13
+  addx 4
+  noop
+  addx -1
+  addx 5
+  addx -1
+  addx 5
+  addx -1
+  addx 5
+  addx -1
+  addx 5
+  addx -1
+  addx -35
+  addx 1
+  addx 24
+  addx -19
+  addx 1
+  addx 16
+  addx -11
+  noop
+  noop
+  addx 21
+  addx -15
+  noop
+  noop
+  addx -3
+  addx 9
+  addx 1
+  addx -3
+  addx 8
+  addx 1
+  addx 5
+  noop
+  noop
+  noop
+  noop
+  noop
+  addx -36
+  noop
+  addx 1
+  addx 7
+  noop
+  noop
+  noop
+  addx 2
+  addx 6
+  noop
+  noop
+  noop
+  noop
+  noop
+  addx 1
+  noop
+  noop
+  addx 7
+  addx 1
+  noop
+  addx -13
+  addx 13
+  addx 7
+  noop
+  addx 1
+  addx -33
+  noop
+  noop
+  noop
+  addx 2
+  noop
+  noop
+  noop
+  addx 8
+  noop
+  addx -1
+  addx 2
+  addx 1
+  noop
+  addx 17
+  addx -9
+  addx 1
+  addx 1
+  addx -3
+  addx 11
+  noop
+  noop
+  addx 1
+  noop
+  addx 1
+  noop
+  noop
+  addx -13
+  addx -19
+  addx 1
+  addx 3
+  addx 26
+  addx -30
+  addx 12
+  addx -1
+  addx 3
+  addx 1
+  noop
+  noop
+  noop
+  addx -9
+  addx 18
+  addx 1
+  addx 2
+  noop
+  noop
+  addx 9
+  noop
+  noop
+  noop
+  addx -1
+  addx 2
+  addx -37
+  addx 1
+  addx 3
+  noop
+  addx 15
+  addx -21
+  addx 22
+  addx -6
+  addx 1
+  noop
+  addx 2
+  addx 1
+  noop
+  addx -10
+  noop
+  noop
+  addx 20
+  addx 1
+  addx 2
+  addx 2
+  addx -6
+  addx -11
+  noop
+  noop
+  noop
+"""
+```
+
+```elixir
+defmodule Load do
+  def input do
+    File.read!(Path.join(Path.absname(__DIR__), "input/10.txt"))
+  end
+end
+```
+
+```elixir
+defmodule Parse do
+  def input(inputString) do
+    inputString
+    |> String.split("\n", trim: true)
+    |> Enum.map(fn line ->
+      line
+      |> String.split(" ", trim: true)
+      |> List.to_tuple()
+    end)
+    |> Enum.map(fn
+      {"noop"} -> {"noop"}
+      {"addx", num_str} -> {"addx", elem(Integer.parse(num_str), 0)}
+    end)
+  end
+end
+
+test_input =
+  test_input_str
+  |> Parse.input()
+```
+
+```elixir
+real_input =
+  Load.input()
+  |> Parse.input()
+```
+
+## Part 1
+
+```elixir
+defmodule Part1 do
+  def is_interesting_cycle(cycle) do
+    rem(cycle - 20, 40) == 0
+  end
+
+  def solve(commands) do
+    results =
+      commands
+      |> Enum.reduce(%{elapsed_cycles: 0, x: 1, signal_strengths: []}, fn command, acc ->
+        new_cycle_count =
+          case command do
+            {"noop"} -> acc.elapsed_cycles + 1
+            {"addx", _} -> acc.elapsed_cycles + 2
+          end
+
+        new_x_val =
+          case command do
+            {"addx", add_val} -> acc.x + add_val
+            {"noop"} -> acc.x
+          end
+
+        interesting_cycle =
+          (acc.elapsed_cycles + 1)..new_cycle_count
+          |> Enum.filter(&is_interesting_cycle(&1))
+          |> List.first()
+
+        new_signal_strengths =
+          case interesting_cycle do
+            nil ->
+              acc.signal_strengths
+
+            cycle ->
+              acc.signal_strengths ++ [{cycle, acc.x * cycle}]
+          end
+
+        %{elapsed_cycles: new_cycle_count, x: new_x_val, signal_strengths: new_signal_strengths}
+      end)
+
+    results.signal_strengths
+    |> Enum.map(&elem(&1, 1))
+    |> Enum.sum()
+  end
+end
+
+Part1.solve(test_input)
+```
+
+```elixir
+Part1.solve(real_input)
+```
+
+## Part 2
+
+```elixir
+defmodule Part2 do
+  def solve(commands) do
+    result =
+      commands
+      |> Enum.map(fn
+        # Insert dummy "addx 0"s to make commands and cpu cycles 1:1
+        {"noop"} -> [{"noop"}]
+        {"addx", x} -> [{"noop"}, {"addx", x}]
+      end)
+      |> List.flatten()
+      |> Enum.reduce(%{elapsed_cycles: 0, x: 1, output_str: ""}, fn command, acc ->
+        sprite_range = (acc.x - 1)..(acc.x + 1)
+        current_cycle = acc.elapsed_cycles
+
+        new_char =
+          case Enum.member?(sprite_range, rem(current_cycle, 40)) do
+            true -> "#"
+            false -> "."
+          end
+
+        new_x_val =
+          case command do
+            {"addx", add_val} -> acc.x + add_val
+            {"noop"} -> acc.x
+          end
+
+        %{
+          elapsed_cycles: acc.elapsed_cycles + 1,
+          x: new_x_val,
+          output_str: acc.output_str <> new_char
+        }
+      end)
+
+    result.output_str
+    |> String.to_charlist()
+    |> Enum.chunk_every(40)
+    |> Enum.join("\n")
+    |> IO.puts()
+  end
+end
+
+Part2.solve(test_input)
+```
+
+```elixir
+Part2.solve(real_input)
+```
