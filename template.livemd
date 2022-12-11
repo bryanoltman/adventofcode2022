@@ -14,23 +14,21 @@ end
 
 ```elixir
 defmodule Parse do
-  def input(inputString) do
-    inputString
+  def input(input_str) do
+    input_str
     |> String.split("\n", trim: true)
   end
 end
-```
 
-```elixir
-realInput =
-  Load.input()
+test_input =
+  """
+  """
   |> Parse.input()
 ```
 
 ```elixir
-testInput =
-  """
-  """
+real_input =
+  Load.input()
   |> Parse.input()
 ```
 
@@ -42,11 +40,11 @@ defmodule Part1 do
   end
 end
 
-Part1.solve(testInput)
+Part1.solve(test_input)
 ```
 
 ```elixir
-Part1.solve(realInput)
+Part1.solve(real_input)
 ```
 
 ## Part 2
@@ -57,9 +55,9 @@ defmodule Part2 do
   end
 end
 
-Part2.solve(testInput)
+Part2.solve(test_input)
 ```
 
 ```elixir
-Part2.solve(realInput)
+Part2.solve(real_input)
 ```
