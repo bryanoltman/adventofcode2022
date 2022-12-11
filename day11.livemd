@@ -1,0 +1,232 @@
+# Day 11
+
+## Setup
+
+https://adventofcode.com/2022/day/11
+
+```elixir
+defmodule Load do
+  def input do
+    File.read!(Path.join(Path.absname(__DIR__), "input/11.txt"))
+  end
+end
+```
+
+```elixir
+defmodule Monkey do
+  defstruct name: "",
+            items: [],
+            operation: nil,
+            divisor: 1,
+            true_target: "",
+            false_target: "",
+            interactions: 0
+end
+```
+
+```elixir
+test_input = %{
+  "0" => %Monkey{
+    name: "0",
+    items: [79, 98],
+    operation: fn x -> x * 19 end,
+    divisor: 23,
+    true_target: "2",
+    false_target: "3"
+  },
+  "1" => %Monkey{
+    name: "1",
+    items: [54, 65, 75, 74],
+    operation: fn x -> x + 6 end,
+    divisor: 19,
+    true_target: "2",
+    false_target: "0"
+  },
+  "2" => %Monkey{
+    name: "2",
+    items: [79, 60, 97],
+    operation: fn x -> x * x end,
+    divisor: 13,
+    true_target: "1",
+    false_target: "3"
+  },
+  "3" => %Monkey{
+    name: "3",
+    items: [74],
+    operation: fn x -> x + 3 end,
+    divisor: 17,
+    true_target: "0",
+    false_target: "1"
+  }
+}
+```
+
+```elixir
+real_input = %{
+  "0" => %Monkey{
+    name: "0",
+    items: [89, 73, 66, 57, 64, 80],
+    operation: fn x -> x * 3 end,
+    divisor: 13,
+    true_target: "6",
+    false_target: "2"
+  },
+  "1" => %Monkey{
+    name: "1",
+    items: [83, 78, 81, 55, 81, 59, 69],
+    operation: fn x -> x + 1 end,
+    divisor: 3,
+    true_target: "7",
+    false_target: "4"
+  },
+  "2" => %Monkey{
+    name: "2",
+    items: [76, 91, 58, 85],
+    operation: fn x -> x * 13 end,
+    divisor: 7,
+    true_target: "1",
+    false_target: "4"
+  },
+  "3" => %Monkey{
+    name: "3",
+    items: [71, 72, 74, 76, 68],
+    operation: fn x -> x * x end,
+    divisor: 2,
+    true_target: "6",
+    false_target: "0"
+  },
+  "4" => %Monkey{
+    name: "4",
+    items: [98, 85, 84],
+    operation: fn x -> x + 7 end,
+    divisor: 19,
+    true_target: "5",
+    false_target: "7"
+  },
+  "5" => %Monkey{
+    name: "5",
+    items: [78],
+    operation: fn x -> x + 8 end,
+    divisor: 5,
+    true_target: "3",
+    false_target: "0"
+  },
+  "6" => %Monkey{
+    name: "6",
+    items: [86, 70, 60, 88, 88, 78, 74, 83],
+    operation: fn x -> x + 4 end,
+    divisor: 11,
+    true_target: "1",
+    false_target: "2"
+  },
+  "7" => %Monkey{
+    name: "7",
+    items: [81, 58],
+    operation: fn x -> x + 5 end,
+    divisor: 17,
+    true_target: "3",
+    false_target: "5"
+  }
+}
+```
+
+## Part 1
+
+```elixir
+defmodule Part1 do
+  def process_items(monkey, all_monkeys, items, shared_divisor, divisor \\ 3)
+
+  def process_items(_, all_monkeys, [], _, _) do
+    all_monkeys
+  end
+
+  def process_items(monkey, all_monkeys, [item | items], shared_divisor, divisor) do
+    new_value =
+      monkey.operation.(item)
+      |> rem(shared_divisor)
+      |> div(divisor)
+
+    target_monkey =
+      case rem(new_value, monkey.divisor) do
+        0 -> all_monkeys[monkey.true_target]
+        _ -> all_monkeys[monkey.false_target]
+      end
+
+    updated_monkey =
+      monkey
+      |> Map.put(:items, items)
+      |> Map.put(:interactions, monkey.interactions + 1)
+
+    updated_target_monkey =
+      target_monkey
+      |> Map.put(:items, target_monkey.items ++ [new_value])
+
+    new_monkeys =
+      all_monkeys
+      |> Map.put(monkey.name, updated_monkey)
+      |> Map.put(target_monkey.name, updated_target_monkey)
+
+    process_items(updated_monkey, new_monkeys, items, shared_divisor, divisor)
+  end
+
+  def do_round(monkeys, divisor \\ 3) do
+    # for Part 2
+    shared_divisor =
+      monkeys
+      |> Enum.reduce(1, fn {_, monkey}, acc ->
+        acc * monkey.divisor
+      end)
+
+    # Monkeys each take a turn during a round
+    monkeys
+    |> Enum.reduce(monkeys, fn {name, _}, acc ->
+      monkey = acc[name]
+      process_items(monkey, acc, monkey.items, shared_divisor, divisor)
+    end)
+  end
+
+  def solve(monkeys) do
+    1..20
+    |> Enum.reduce(monkeys, fn _, acc ->
+      do_round(acc)
+    end)
+    |> Enum.map(fn {_, monkey} -> monkey.interactions end)
+    |> Enum.sort()
+    |> Enum.reverse()
+    |> Enum.take(2)
+    |> Enum.reduce(1, fn x, acc -> acc * x end)
+  end
+end
+
+Part1.solve(test_input)
+```
+
+```elixir
+Part1.solve(real_input)
+```
+
+## Part 2
+
+This part was a bit tricky – I had to reference reddit to find the divisor trick. tl;dr, dividing incredibly large numbers is expensive, so we take the product of every monkey's divisor and use that to keep the running worry levels (reasonably) small.
+
+```elixir
+defmodule Part2 do
+  def solve(monkeys) do
+    1..10000
+    |> Enum.reduce(monkeys, fn _, acc ->
+      Part1.do_round(acc, 1)
+    end)
+    |> Enum.map(fn {_, monkey} -> monkey.interactions end)
+    |> Enum.sort()
+    |> Enum.reverse()
+    |> Enum.take(2)
+    |> Enum.reduce(1, fn x, acc -> acc * x end)
+  end
+end
+
+Part2.solve(test_input)
+```
+
+```elixir
+Part2.solve(real_input)
+```
