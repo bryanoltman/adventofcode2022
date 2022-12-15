@@ -48,18 +48,10 @@ defmodule Matrix do
   end
 
   defp do_to_list(matrix) when is_map(matrix) do
-    matrix
-    |> Map.keys()
-    |> Enum.sort()
-    |> Enum.reduce([], fn y, acc ->
-      row =
-        matrix[y]
-        |> Map.keys()
-        |> Enum.sort()
-        |> Enum.map(fn x -> matrix[y][x] end)
-
-      acc ++ row
-    end)
+    Enum.to_list(matrix)
+    |> Enum.sort_by(&elem(&1, 0))
+    |> Enum.map(fn x -> elem(x, 1) end)
+    |> Enum.map(fn x -> do_to_list(x) end)
   end
 
   defp do_to_list(other), do: other
