@@ -1,0 +1,337 @@
+# Day 14
+
+## Setup
+
+https://adventofcode.com/2022/day/14
+
+```elixir
+# Taken from https://blog.danielberkompas.com/2016/04/23/multidimensional-arrays-in-elixir/
+defmodule Matrix do
+  @moduledoc """
+  Helpers for working with multidimensional lists, also called matrices.
+  """
+
+  @doc """
+  Converts a multidimensional list into a zero-indexed map.
+
+  ## Example
+
+      iex> list = [["x", "o", "x"]]
+      ...> Matrix.from_list(list)
+      %{0 => %{0 => "x", 1 => "o", 2 => "x"}}
+  """
+  def from_list(list) when is_list(list) do
+    do_from_list(list)
+  end
+
+  defp do_from_list(list, map \\ %{}, index \\ 0)
+  defp do_from_list([], map, _index), do: map
+
+  defp do_from_list([h | t], map, index) do
+    map = Map.put(map, index, do_from_list(h))
+    do_from_list(t, map, index + 1)
+  end
+
+  defp do_from_list(other, _, _), do: other
+
+  @doc """
+  Converts a zero-indexed map into a multidimensional list.
+
+  ## Example
+
+      iex> matrix = %{0 => %{0 => "x", 1 => "o", 2 => "x"}}
+      ...> Matrix.to_list(matrix)
+      [["x", "o", "x"]]
+  """
+  def to_list(matrix) when is_map(matrix) do
+    do_to_list(matrix)
+  end
+
+  defp do_to_list(matrix) when is_map(matrix) do
+    matrix
+    |> Map.keys()
+    |> Enum.sort()
+    |> Enum.reduce([], fn y, acc ->
+      row =
+        matrix[y]
+        |> Map.keys()
+        |> Enum.sort()
+        |> Enum.map(fn x -> matrix[y][x] end)
+
+      acc ++ row
+    end)
+  end
+
+  defp do_to_list(other), do: other
+
+  def contains_point(matrix, %{x: x, y: y}) do
+    y >= 0 and y < Enum.count(matrix) and x >= 0 and x < Enum.count(matrix[0])
+  end
+
+  def print(matrix) do
+    matrix
+    |> Map.keys()
+    |> Enum.reduce([], fn y, acc ->
+      row =
+        matrix[y]
+        |> Map.keys()
+        |> Enum.sort()
+        |> Enum.map(fn key -> matrix[y][key] end)
+        |> Enum.join()
+
+      acc ++ [row]
+    end)
+    |> Enum.each(&IO.inspect(&1))
+
+    matrix
+  end
+end
+```
+
+```elixir
+defmodule Load do
+  def input do
+    File.read!(Path.join(Path.absname(__DIR__), "input/14.txt"))
+  end
+end
+```
+
+```elixir
+defmodule Parse do
+  def starting_grid(width, height) do
+    0..height
+    |> Enum.reduce([], fn _, acc ->
+      acc ++
+        [
+          0..width
+          |> Enum.map(fn _ -> "." end)
+        ]
+    end)
+    |> Matrix.from_list()
+  end
+
+  # Vertical line
+  def points_in_segment({%{x: x1, y: y1}, %{x: x2, y: y2}}) when x1 == x2 do
+    y1..y2
+    |> Enum.map(fn y -> %{x: x1, y: y} end)
+  end
+
+  # Horizontal line
+  def points_in_segment({%{x: x1, y: y1}, %{x: x2, y: y2}}) when y1 == y2 do
+    x1..x2
+    |> Enum.map(fn x -> %{x: x, y: y1} end)
+  end
+
+  def input(input_str) do
+    line_ends =
+      input_str
+      |> String.split("\n", trim: true)
+      |> Enum.map(fn line ->
+        line
+        |> String.split(" -> ", trim: true)
+        |> Enum.map(fn point ->
+          [x, y] =
+            point
+            |> String.split(",", trim: true)
+            |> Enum.map(&elem(Integer.parse(&1), 0))
+
+          %{x: x, y: y}
+        end)
+      end)
+
+    all_points =
+      line_ends
+      |> List.flatten()
+
+    x_points =
+      all_points
+      |> Enum.map(fn %{x: x, y: _} -> x end)
+
+    y_points =
+      all_points
+      |> Enum.map(fn %{x: _, y: y} -> y end)
+
+    min_x = Enum.min(x_points)
+    max_x = Enum.max(x_points)
+    max_y = Enum.max(y_points)
+
+    # Line segments so the leftmost point is 0
+    line_segments =
+      line_ends
+      |> Enum.map(fn line ->
+        line
+        |> Enum.map(fn %{x: x, y: y} ->
+          %{x: x - min_x, y: y}
+        end)
+        |> Enum.chunk_every(2, 1, :discard)
+        |> Enum.map(&List.to_tuple(&1))
+      end)
+      |> List.flatten()
+
+    points =
+      line_segments
+      |> Enum.map(&points_in_segment(&1))
+      |> List.flatten()
+
+    grid =
+      Enum.reduce(points, starting_grid(max_x - min_x, max_y), fn %{x: x, y: y}, acc ->
+        put_in(acc[y][x], "#")
+      end)
+
+    Matrix.print(grid)
+    {grid, min_x}
+  end
+end
+
+test_input =
+  """
+  498,4 -> 498,6 -> 496,6
+  503,4 -> 502,4 -> 502,9 -> 494,9
+  """
+
+  # "463,67 -> 463,57 -> 463,67 -> 465,67 -> 465,64 -> 465,67 -> 467,67 -> 467,64 -> 467,67 -> 469,67 -> 469,57 -> 469,67 -> 471,67 -> 471,62 -> 471,67 -> 473,67 -> 473,57 -> 473,67 -> 475,67 -> 475,65 -> 475,67 -> 477,67 -> 477,57 -> 477,67 -> 479,67 -> 479,58 -> 479,67"
+  # "463,67 -> 463,57"# -> 463,67 -> 465,67 -> 465,64"#-> 465,67 -> 467,67 -> 467,64 -> 467,67 -> 469,67 -> 469,57 -> 469,67 -> 471,67 -> 471,62 -> 471,67 -> 473,67 -> 473,57 -> 473,67 -> 475,67 -> 475,65 -> 475,67 -> 477,67 -> 477,57 -> 477,67 -> 479,67 -> 479,58 -> 479,67"
+  |> Parse.input()
+```
+
+```elixir
+real_input =
+  Load.input()
+  |> Parse.input()
+```
+
+## Part 1
+
+```elixir
+defmodule Day14 do
+  def sand_source(x_offset) do
+    %{x: 500 - x_offset, y: 0}
+  end
+
+  # new point if sand can move, nil if it cannot
+  def next_step(grid, sand) do
+    y = sand.y + 1
+    down = %{x: sand.x, y: y}
+    down_left = %{x: sand.x - 1, y: y}
+    down_right = %{x: sand.x + 1, y: y}
+
+    matching_point =
+      [down, down_left, down_right]
+      |> Enum.find(fn %{x: x, y: y} ->
+        grid[y][x] == "." or !Matrix.contains_point(grid, %{x: x, y: y})
+      end)
+
+    cond do
+      matching_point == nil -> sand
+      !Matrix.contains_point(grid, matching_point) -> nil
+      true -> next_step(grid, matching_point)
+    end
+  end
+
+  def next_step_2(grid, sand, sand_source) do
+    y = sand.y + 1
+    down = %{x: sand.x, y: y}
+    down_left = %{x: sand.x - 1, y: y}
+    down_right = %{x: sand.x + 1, y: y}
+
+    matching_point =
+      [down, down_left, down_right]
+      |> Enum.find(fn %{x: x, y: y} ->
+        grid[y][x] == "." or !Matrix.contains_point(grid, %{x: x, y: y})
+      end)
+
+    cond do
+      matching_point == nil -> sand
+      !Matrix.contains_point(grid, matching_point) -> nil
+      true -> next_step(grid, matching_point)
+    end
+  end
+
+  def fill_grid(grid, x_offset) do
+    source = sand_source(x_offset)
+
+    0..24500
+    |> Enum.reduce({grid, 0}, fn _, {acc, i} ->
+      sand = next_step(acc, source)
+
+      if sand == nil do
+        {acc, i}
+      else
+        {put_in(acc[sand.y][sand.x], "o"), i + 1}
+      end
+    end)
+  end
+end
+```
+
+```elixir
+defmodule Part1 do
+  def solve({grid, x_offset}) do
+    {filled_grid, grain_count} = Day14.fill_grid(grid, x_offset)
+
+    Matrix.print(filled_grid)
+    grain_count
+  end
+end
+
+Part1.solve(test_input)
+```
+
+```elixir
+Part1.solve(real_input)
+```
+
+## Part 2
+
+```elixir
+defmodule Part2 do
+  def solve({grid, x_offset}) do
+    starting_width = Enum.count(grid[0])
+    new_height = Enum.count(grid) + 2
+    padding_width = new_height * 3
+    new_width = padding_width * 2 + Enum.count(grid[0])
+    padding = String.duplicate(".", padding_width) |> String.split("", trim: true)
+
+    padded =
+      grid
+      |> Matrix.to_list()
+      |> Enum.map(fn row ->
+        padding ++ row ++ padding
+      end)
+      |> List.insert_at(
+        new_height - 1,
+        String.duplicate(".", new_width) |> String.split("", trim: true)
+      )
+      |> List.insert_at(
+        new_height,
+        String.duplicate("#", new_width) |> String.split("", trim: true)
+      )
+      |> Matrix.from_list()
+
+    # |> Matrix.print()
+
+    source = Day14.sand_source(x_offset - padding_width)
+
+    {result, count} =
+      0..1_000_000
+      |> Enum.reduce({padded, 0}, fn _, {acc, i} ->
+        sand = Day14.next_step(acc, source)
+
+        if sand == source do
+          {put_in(acc[sand.y][sand.x], "o"), i}
+        else
+          {put_in(acc[sand.y][sand.x], "o"), i + 1}
+        end
+      end)
+
+    Matrix.print(result)
+    count + 1
+  end
+end
+
+Part2.solve(test_input)
+```
+
+```elixir
+Part2.solve(real_input)
+```
