@@ -1,0 +1,202 @@
+# Day 15
+
+## Setup
+
+https://adventofcode.com/2022/day/15
+
+```elixir
+defmodule Load do
+  def input do
+    File.read!(Path.join(Path.absname(__DIR__), "input/15.txt"))
+  end
+end
+```
+
+```elixir
+defmodule Sensor do
+  defstruct x: 0, y: 0, beaconX: 0, beaconY: 0
+
+  defp line_regex do
+    ~r/Sensor at x=(?<x>.?\d+), y=(?<y>.?\d+): closest beacon is at x=(?<beaconX>.?\d+), y=(?<beaconY>.?\d+)/
+  end
+
+  @spec new(String.t()) :: Sensor
+  def new(line) do
+    map =
+      Regex.named_captures(line_regex(), line)
+      |> Enum.map(fn {k, v} -> {String.to_atom(k), elem(Integer.parse(v), 0)} end)
+      |> Map.new()
+
+    struct(Sensor, map)
+  end
+
+  def distance_to_point(sensor, {x, y}) do
+    abs(sensor.x - x) + abs(sensor.y - y)
+  end
+
+  def distance_to_beacon(sensor) do
+    distance_to_point(sensor, {sensor.beaconX, sensor.beaconY})
+  end
+
+  # List of x points covered by this sensor at y = y_position
+  def y_position_coverage(sensor, y_position) do
+    case x_range_at_y(sensor, y_position) do
+      nil -> []
+      some -> Enum.to_list(some)
+    end
+  end
+
+  def covers_point(sensor, {x, y}) do
+    distance_to_point(sensor, {x, y}) <= distance_to_beacon(sensor)
+  end
+
+  def x_range_at_y(sensor, y) do
+    # y_position containing sensor has distance_to_beacon * 2 + 1 coverage (+1 for the sensor itself)
+    # Each y step away has two fewer points of coverage
+    y_diff = abs(sensor.y - y)
+
+    # the width of the widest row of sensor reach
+    max_width = distance_to_beacon(sensor) * 2 + 1
+
+    # the width of sensor reach at y_position
+    y_width = max_width - y_diff * 2
+
+    # the width of reach on either side of the sensor
+    horizontal_reach = div(y_width, 2)
+
+    case max(y_width, 0) do
+      0 -> nil
+      _ -> (sensor.x - horizontal_reach)..(sensor.x + horizontal_reach)
+    end
+  end
+end
+
+Sensor.new("Sensor at x=8, y=7: closest beacon is at x=2, y=10")
+|> Sensor.x_range_at_y(0)
+```
+
+```elixir
+defmodule Parse do
+  def sensor_from_line(line) do
+  end
+
+  def input(input_str) do
+    input_str
+    |> String.split("\n", trim: true)
+    |> Enum.map(&Sensor.new(&1))
+  end
+end
+
+test_input =
+  """
+  Sensor at x=2, y=18: closest beacon is at x=-2, y=15
+  Sensor at x=9, y=16: closest beacon is at x=10, y=16
+  Sensor at x=13, y=2: closest beacon is at x=15, y=3
+  Sensor at x=12, y=14: closest beacon is at x=10, y=16
+  Sensor at x=10, y=20: closest beacon is at x=10, y=16
+  Sensor at x=14, y=17: closest beacon is at x=10, y=16
+  Sensor at x=8, y=7: closest beacon is at x=2, y=10
+  Sensor at x=2, y=0: closest beacon is at x=2, y=10
+  Sensor at x=0, y=11: closest beacon is at x=2, y=10
+  Sensor at x=20, y=14: closest beacon is at x=25, y=17
+  Sensor at x=17, y=20: closest beacon is at x=21, y=22
+  Sensor at x=16, y=7: closest beacon is at x=15, y=3
+  Sensor at x=14, y=3: closest beacon is at x=15, y=3
+  Sensor at x=20, y=1: closest beacon is at x=15, y=3
+  """
+  |> Parse.input()
+```
+
+```elixir
+real_input =
+  Load.input()
+  |> Parse.input()
+```
+
+## Part 1
+
+```elixir
+defmodule Part1 do
+  def solve(sensors, row) do
+    beacons_in_row =
+      sensors
+      |> Enum.filter(fn sensor -> sensor.beaconY == row end)
+      |> Enum.map(fn sensor -> {sensor.beaconX, sensor.beaconY} end)
+      |> MapSet.new()
+
+    position_count =
+      sensors
+      |> Enum.map(fn sensor -> Sensor.y_position_coverage(sensor, row) end)
+      |> List.flatten()
+      |> MapSet.new()
+      |> Enum.count()
+
+    position_count - Enum.count(beacons_in_row)
+  end
+end
+
+Part1.solve(test_input, 10)
+```
+
+```elixir
+Part1.solve(real_input, 2_000_000)
+```
+
+## Part 2
+
+```elixir
+defmodule Part2 do
+  def search_rows(_, y, max_coord) when y > max_coord do
+    nil
+  end
+
+  def search_rows(sensors, y, max_coord) do
+    ranges =
+      sensors
+      |> Enum.map(&Sensor.x_range_at_y(&1, y))
+      |> Enum.filter(& &1)
+      |> Enum.sort()
+
+    combined_range =
+      ranges
+      |> Enum.reduce([Enum.at(ranges, 0)], fn range, acc ->
+        if Enum.count(acc) > 1 do
+          acc
+        else
+          running_range = List.last(acc)
+
+          case Range.disjoint?(range, running_range) do
+            true ->
+              [acc, range]
+
+            false ->
+              start_acc..end_acc = running_range
+              _..end_range = range
+              [start_acc..max(end_acc, end_range)]
+          end
+        end
+      end)
+
+    case Enum.count(combined_range) do
+      1 ->
+        search_rows(sensors, y + 1, max_coord)
+
+      _ ->
+        {List.flatten(combined_range), y}
+    end
+  end
+
+  def solve(input, max_coord) do
+    min_coord = 0
+    {ranges, y} = search_rows(input, min_coord, max_coord)
+    [_..a_end, _.._] = ranges
+    (a_end + 1) * 4_000_000 + y
+  end
+end
+
+Part2.solve(test_input, 20)
+```
+
+```elixir
+Part2.solve(real_input, 4_000_000)
+```
