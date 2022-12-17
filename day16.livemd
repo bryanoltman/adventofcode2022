@@ -105,8 +105,6 @@ defmodule Part1 do
         route_map,
         minutes_left
       ) do
-    # IO.puts("at " <> inspect(current_valve) <> ", " <> inspect(minutes_left) <> " minutes left")
-
     new_closed_valves = MapSet.delete(closed_valves, current_valve)
 
     # If the starting valve has a flow rate of 0 (it does), we don't actually close it.
@@ -127,18 +125,8 @@ defmodule Part1 do
       |> Enum.map(fn valve ->
         route = route_map[current_valve][valve]
 
-        # IO.puts(
-        #   "route from " <>
-        #     inspect(current_valve) <> " to " <> inspect(valve) <> " is " <> inspect(route)
-        # )
-
         # -1 to exclude current_valve from the path
         distance = Enum.count(route) - 1
-
-        # IO.puts(
-        #   "distance from " <>
-        #     inspect(current_valve) <> " to " <> inspect(valve) <> " is " <> inspect(distance)
-        # )
 
         visit_valves(
           valve,
@@ -222,10 +210,77 @@ Part1.solve(real_input)
 
 ```elixir
 defmodule Part2 do
-  def solve(valve_graph) do
-    minutes = 30
+  # No more valves left to close
+  def visit_valves(_, [], opened_valves, _, _, _) do
+    [{opened_valves}]
+  end
 
-    first_valve = Part1.get_valve(valve_graph, "AA")
+  # We ran out of time before getting to this valve
+  def visit_valves(_, _, opened_valves, _, _, minutes_left) when minutes_left <= 0 do
+    [{opened_valves}]
+  end
+
+  def visit_valves(
+        current_valve,
+        closed_valves,
+        opened_valves,
+        valve_graph,
+        route_map,
+        minutes_left
+      ) do
+    new_closed_valves = MapSet.delete(closed_valves, current_valve)
+
+    # If the starting valve has a flow rate of 0 (it does), we don't actually close it.
+    # Don't count it against our running time.
+    {new_opened_valves, minutes_after_opening} =
+      case current_valve.flow_rate do
+        0 ->
+          {opened_valves, minutes_left}
+
+        _ ->
+          {opened_valves ++ [{current_valve, minutes_left - 1}], minutes_left - 1}
+      end
+
+    if Enum.count(new_closed_valves) == 0 do
+      [{new_opened_valves}]
+    else
+      new_closed_valves
+      |> Enum.map(fn valve ->
+        route = route_map[current_valve][valve]
+
+        # -1 to exclude current_valve from the path
+        distance = Enum.count(route) - 1
+
+        stop_here_open_valves =
+          cond do
+            # Because there are two simultaneous runners, stopping here may yield an optimal route.
+            # 3 is arbitrarily chosen and may need to be tuned.
+            Enum.count(new_opened_valves) > 2 -> [{new_opened_valves}]
+            true -> []
+          end
+
+        visit_valves(
+          valve,
+          new_closed_valves,
+          new_opened_valves,
+          valve_graph,
+          route_map,
+          minutes_after_opening - distance
+        ) ++ stop_here_open_valves
+      end)
+    end
+  end
+
+  def get_valve(valve_graph, name) do
+    valve_graph
+    |> :digraph.vertices()
+    |> Enum.find(fn valve -> valve.name == name end)
+  end
+
+  def solve(valve_graph) do
+    minutes = 26
+
+    first_valve = get_valve(valve_graph, "AA")
 
     nonzero_valves =
       valve_graph
@@ -258,7 +313,7 @@ defmodule Part2 do
       |> Map.new()
 
     route_flows =
-      Part1.visit_valves(
+      visit_valves(
         first_valve,
         MapSet.new(valves_to_visit),
         [],
@@ -280,21 +335,28 @@ defmodule Part2 do
            acc + valve.flow_rate * minutes
          end)}
       end)
+      |> Enum.sort_by(fn {_, pressure} -> pressure end, :desc)
+      |> Enum.uniq_by(fn {route, _} -> route end)
 
-    Enum.reduce(route_flows, [], fn {a_route, a_pressure}, acc ->
-      Enum.reduce(route_flows, [], fn {b_route, b_pressure}, acc ->
-        res =
-          cond do
-            a_route == b_route -> acc
-            MapSet.disjoint?(a_route, b_route) -> acc ++ [{a_pressure, b_pressure}]
-            true -> acc
-          end
+    IO.puts("Comparing " <> inspect(Enum.count(route_flows)) <> " routes")
+
+    {mine, elephants} =
+      Enum.reduce(route_flows, [], fn {a_route, a_pressure}, acc ->
+        acc ++
+          Enum.reduce(route_flows, [], fn {b_route, b_pressure}, acc ->
+            cond do
+              a_route == b_route -> acc
+              MapSet.disjoint?(a_route, b_route) -> acc ++ [{a_pressure, b_pressure}]
+              true -> acc
+            end
+          end)
       end)
-    end)
+      |> Enum.max_by(fn {a, b} -> a + b end)
+
+    mine + elephants
   end
 end
 
-# TODO: finish implementing
 Part2.solve(test_input)
 ```
 
