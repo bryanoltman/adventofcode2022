@@ -1,0 +1,394 @@
+# Day 17
+
+## Setup
+
+https://adventofcode.com/2022/day/17
+
+```elixir
+defmodule Load do
+  def input do
+    File.read!(Path.join(Path.absname(__DIR__), "input/17.txt"))
+  end
+end
+```
+
+```elixir
+defmodule Parse do
+  def input(input_str) do
+    input_str
+    |> String.split("", trim: true)
+  end
+end
+
+test_input =
+  ">>><<><>><<<>><>>><<<>>><<<><<<>><>><<>>"
+  |> Parse.input()
+```
+
+```elixir
+real_input =
+  Load.input()
+  |> Parse.input()
+```
+
+```elixir
+# Taken from https://blog.danielberkompas.com/2016/04/23/multidimensional-arrays-in-elixir/
+defmodule Matrix do
+  @moduledoc """
+  Helpers for working with multidimensional lists, also called matrices.
+  """
+
+  @doc """
+  Converts a multidimensional list into a zero-indexed map.
+
+  ## Example
+
+      iex> list = [["x", "o", "x"]]
+      ...> Matrix.from_list(list)
+      %{0 => %{0 => "x", 1 => "o", 2 => "x"}}
+  """
+  def from_list(list) when is_list(list) do
+    do_from_list(list)
+  end
+
+  defp do_from_list(list, map \\ %{}, index \\ 0)
+  defp do_from_list([], map, _index), do: map
+
+  defp do_from_list([h | t], map, index) do
+    map = Map.put(map, index, do_from_list(h))
+    do_from_list(t, map, index + 1)
+  end
+
+  defp do_from_list(other, _, _), do: other
+
+  @doc """
+  Converts a zero-indexed map into a multidimensional list.
+
+  ## Example
+
+      iex> matrix = %{0 => %{0 => "x", 1 => "o", 2 => "x"}}
+      ...> Matrix.to_list(matrix)
+      [["x", "o", "x"]]
+  """
+  def to_list(matrix) when is_map(matrix) do
+    do_to_list(matrix)
+  end
+
+  defp do_to_list(matrix) when is_map(matrix) do
+    Enum.to_list(matrix)
+    |> Enum.sort_by(&elem(&1, 0))
+    |> Enum.map(fn x -> elem(x, 1) end)
+    |> Enum.map(fn x -> do_to_list(x) end)
+  end
+
+  defp do_to_list(other), do: other
+
+  # boltman additions
+
+  def all_points(matrix) do
+    matrix
+    |> Enum.to_list()
+    |> Enum.sort_by(&elem(&1, 0))
+    |> Enum.reduce([], fn {y, row}, acc ->
+      points =
+        row
+        |> Enum.to_list()
+        |> Enum.map(&elem(&1, 0))
+        |> Enum.sort()
+        |> Enum.reduce([], fn x, acc -> acc ++ [%{x: x, y: y}] end)
+
+      acc ++ points
+    end)
+  end
+
+  def contains_point(matrix, %{x: x, y: y}) do
+    y >= 0 and y < Enum.count(matrix) and x >= 0 and x < Enum.count(matrix[0])
+  end
+
+  def print(matrix) do
+    matrix
+    |> Map.keys()
+    |> Enum.reduce([], fn y, acc ->
+      row =
+        matrix[y]
+        |> Map.keys()
+        |> Enum.sort()
+        |> Enum.map(fn key -> matrix[y][key] end)
+        |> Enum.join()
+
+      acc ++ [row]
+    end)
+    |> Enum.each(&IO.inspect(&1))
+
+    matrix
+  end
+end
+```
+
+```elixir
+defmodule Block do
+  @blocks [
+            [
+              "####"
+            ],
+            [
+              ".#.",
+              "###",
+              ".#."
+            ],
+            [
+              "..#",
+              "..#",
+              "###"
+            ],
+            [
+              "#",
+              "#",
+              "#",
+              "#"
+            ],
+            [
+              "##",
+              "##"
+            ]
+          ]
+          |> Enum.map(fn lists ->
+            Enum.map(lists, fn str -> String.split(str, "", trim: true) end)
+          end)
+          |> Enum.map(&Matrix.from_list(&1))
+
+  def block(index) do
+    block_index = rem(index, Enum.count(@blocks))
+    Enum.at(@blocks, block_index)
+  end
+end
+
+Block.block(0)
+|> Matrix.all_points()
+```
+
+## Part 1
+
+```elixir
+defmodule Part1 do
+  @width 7
+
+  # Left edge = 2
+  # Bottom edge = 3 units above the highest rock in the room (or the floor, if there isn't one).
+  # Bottom edge is accounted for by the board padding that happens in add_block
+  def starting_block_offset(block) do
+    %{x: 2, y: 0}
+  end
+
+  def jet_movement(moves, index) do
+    Enum.at(moves, rem(index, Enum.count(moves)))
+  end
+
+  def row(character) do
+    String.duplicate(character, @width) |> String.split("", trim: true)
+  end
+
+  def floor_row() do
+    row("-")
+  end
+
+  def new_empty_row() do
+    row(".")
+  end
+
+  # number of empty rows in the board
+  def num_empty_rows(board) do
+    empty_row = new_empty_row() |> Enum.join()
+
+    board
+    |> Matrix.to_list()
+    |> Enum.map(&Enum.join(&1))
+    |> Enum.reduce(0, fn row, count ->
+      cond do
+        row == empty_row -> count + 1
+        true -> count
+      end
+    end)
+  end
+
+  def num_needed_empty_rows(board, block) do
+    block_height = Enum.count(block)
+    req_padding = 3
+    max(0, block_height + req_padding - num_empty_rows(board))
+  end
+
+  def add_empty_rows_to_top(board, block) do
+    num_rows_needed = num_needed_empty_rows(board, block)
+    # IO.puts("need " <> inspect(num_rows_needed) <> " rows")
+    # IO.puts("adding " <> inspect(num_rows_needed) <> " rows")
+
+    new_rows = 0..(num_rows_needed - 1) |> Enum.map(fn _ -> new_empty_row() end)
+
+    list_board =
+      board
+      |> Matrix.to_list()
+
+    (new_rows ++ list_board) |> Matrix.from_list()
+  end
+
+  def add_block(board, block_num, jet_movements, jet_offset) do
+    block = Block.block(block_num)
+    block_plus_padding_height = Enum.count(block) + 3
+
+    padded_board =
+      board
+      |> add_empty_rows_to_top(block)
+
+    empty_row_count = num_empty_rows(padded_board)
+    starting_y_offset = empty_row_count - block_plus_padding_height
+
+    # IO.puts("in add_block, empty_rows: " <> inspect(empty_row_count))
+
+    block_offset =
+      starting_block_offset(block)
+      |> translate_point(%{x: 0, y: starting_y_offset})
+
+    # IO.puts("starting block offset is " <> inspect(block_offset))
+
+    padded_board
+    |> position_block(block, block_offset, jet_movements, jet_offset)
+  end
+
+  def translate_point(point, %{x: x, y: y}) do
+    %{x: point.x + x, y: point.y + y}
+  end
+
+  def is_valid_position(board, block, offset) do
+    block_points =
+      block
+      |> Matrix.all_points()
+      |> Enum.all?(fn %{x: x, y: y} ->
+        board_point = translate_point(%{x: x, y: y}, offset)
+
+        # IO.puts(
+        #   "board at " <>
+        #     inspect({board_point.x, board_point.y}) <>
+        #     " is " <> inspect(board[board_point.y][board_point.x])
+        # )
+
+        # IO.puts("block at " <> inspect({x, y}) <> " is " <> inspect(block[y][x]))
+
+        case board[board_point.y][board_point.x] do
+          # "." is an empty space
+          "." -> true
+          # if the block has an empty space, this is fine
+          _ -> block[y][x] != "#"
+        end
+      end)
+  end
+
+  # finalizes block's position on board by replacing "."s with block characters
+  def place_block_on_board(board, block, %{x: x, y: y}) do
+    y..(y + Enum.count(block) - 1)
+    |> Enum.reduce(board, fn yPos, acc ->
+      x..(x + Enum.count(block[0]) - 1)
+      |> Enum.reduce(acc, fn xPos, acc ->
+        block_character = block[yPos - y][xPos - x]
+        put_in(acc[yPos][xPos], block_character)
+      end)
+    end)
+  end
+
+  def position_block(board, block, block_offset, jet_movements, jet_offset) do
+    # IO.puts(" ")
+    # IO.puts("----")
+    # IO.puts(" ")
+
+    # board
+    # |> place_block_on_board(block, block_offset)
+    # |> Matrix.print()
+
+    jet_direction = jet_movement(jet_movements, jet_offset)
+
+    # IO.puts("shifting " <> jet_direction)
+
+    proposed_x_shifted_offset =
+      case jet_direction do
+        "<" -> %{x: block_offset.x - 1, y: block_offset.y}
+        ">" -> %{x: block_offset.x + 1, y: block_offset.y}
+      end
+
+    # IO.puts(inspect(block_offset) <> " x shifted to " <> inspect(proposed_x_shifted_offset))
+    # IO.puts("is valid? " <> inspect(is_valid_position(board, block, proposed_x_shifted_offset)))
+
+    x_shifted_offset =
+      cond do
+        is_valid_position(board, block, proposed_x_shifted_offset) -> proposed_x_shifted_offset
+        true -> block_offset
+      end
+
+    proposed_xy_shifted_offset = %{x: x_shifted_offset.x, y: x_shifted_offset.y + 1}
+    # IO.puts(inspect(block_offset) <> " y shifted to " <> inspect(proposed_xy_shifted_offset))
+    # IO.puts("is valid? " <> inspect(is_valid_position(board, block, proposed_xy_shifted_offset)))
+
+    xy_shifted_offset =
+      case is_valid_position(board, block, proposed_xy_shifted_offset) do
+        true -> proposed_xy_shifted_offset
+        false -> x_shifted_offset
+      end
+
+    # is_at_bottom =
+    #   not is_valid_position(board, block, %{x: xy_shifted_offset.x, y: xy_shifted_offset.y + 1})
+    is_at_bottom = xy_shifted_offset == x_shifted_offset
+
+    # IO.puts("is at bottom? " <> inspect(is_at_bottom))
+
+    # board
+    # |> place_block_on_board(block, xy_shifted_offset)
+    # |> Matrix.print()
+
+    cond do
+      xy_shifted_offset == block_offset or is_at_bottom ->
+        {place_block_on_board(board, block, xy_shifted_offset), jet_offset + 1}
+
+      true ->
+        position_block(board, block, xy_shifted_offset, jet_movements, jet_offset + 1)
+    end
+  end
+
+  def solve(jet_movements) do
+    num_turns = 2022
+
+    # starting board is just the floor
+    starting_board =
+      [floor_row()]
+      |> Matrix.from_list()
+
+    final_matrix =
+      0..(num_turns - 1)
+      |> Enum.reduce({starting_board, 0}, fn turn, {board, jet_offset} ->
+        add_block(board, turn, jet_movements, jet_offset)
+      end)
+      |> elem(0)
+
+    empty_row_count = num_empty_rows(final_matrix)
+    Enum.count(final_matrix) - empty_row_count - 1
+  end
+end
+
+Part1.solve(test_input)
+```
+
+```elixir
+Part1.solve(real_input)
+```
+
+## Part 2
+
+```elixir
+defmodule Part2 do
+  def solve(input) do
+  end
+end
+
+Part2.solve(test_input)
+```
+
+```elixir
+Part2.solve(real_input)
+```
