@@ -16,6 +16,7 @@ end
 defmodule Parse do
   def input(input_str) do
     input_str
+    |> String.trim()
     |> String.split("", trim: true)
   end
 end
@@ -108,6 +109,7 @@ defmodule Matrix do
   def print(matrix) do
     matrix
     |> Map.keys()
+    |> Enum.sort()
     |> Enum.reduce([], fn y, acc ->
       row =
         matrix[y]
@@ -176,12 +178,14 @@ defmodule Part1 do
   # Left edge = 2
   # Bottom edge = 3 units above the highest rock in the room (or the floor, if there isn't one).
   # Bottom edge is accounted for by the board padding that happens in add_block
-  def starting_block_offset(block) do
-    %{x: 2, y: 0}
-  end
+  @starting_block_offset %{x: 2, y: 0}
 
   def jet_movement(moves, index) do
     Enum.at(moves, rem(index, Enum.count(moves)))
+  end
+
+  def translate_point(point, %{x: x, y: y}) do
+    %{x: point.x + x, y: point.y + y}
   end
 
   def row(character) do
@@ -231,57 +235,6 @@ defmodule Part1 do
     (new_rows ++ list_board) |> Matrix.from_list()
   end
 
-  def add_block(board, block_num, jet_movements, jet_offset) do
-    block = Block.block(block_num)
-    block_plus_padding_height = Enum.count(block) + 3
-
-    padded_board =
-      board
-      |> add_empty_rows_to_top(block)
-
-    empty_row_count = num_empty_rows(padded_board)
-    starting_y_offset = empty_row_count - block_plus_padding_height
-
-    # IO.puts("in add_block, empty_rows: " <> inspect(empty_row_count))
-
-    block_offset =
-      starting_block_offset(block)
-      |> translate_point(%{x: 0, y: starting_y_offset})
-
-    # IO.puts("starting block offset is " <> inspect(block_offset))
-
-    padded_board
-    |> position_block(block, block_offset, jet_movements, jet_offset)
-  end
-
-  def translate_point(point, %{x: x, y: y}) do
-    %{x: point.x + x, y: point.y + y}
-  end
-
-  def is_valid_position(board, block, offset) do
-    block_points =
-      block
-      |> Matrix.all_points()
-      |> Enum.all?(fn %{x: x, y: y} ->
-        board_point = translate_point(%{x: x, y: y}, offset)
-
-        # IO.puts(
-        #   "board at " <>
-        #     inspect({board_point.x, board_point.y}) <>
-        #     " is " <> inspect(board[board_point.y][board_point.x])
-        # )
-
-        # IO.puts("block at " <> inspect({x, y}) <> " is " <> inspect(block[y][x]))
-
-        case board[board_point.y][board_point.x] do
-          # "." is an empty space
-          "." -> true
-          # if the block has an empty space, this is fine
-          _ -> block[y][x] != "#"
-        end
-      end)
-  end
-
   # finalizes block's position on board by replacing "."s with block characters
   def place_block_on_board(board, block, %{x: x, y: y}) do
     y..(y + Enum.count(block) - 1)
@@ -289,8 +242,35 @@ defmodule Part1 do
       x..(x + Enum.count(block[0]) - 1)
       |> Enum.reduce(acc, fn xPos, acc ->
         block_character = block[yPos - y][xPos - x]
-        put_in(acc[yPos][xPos], block_character)
+
+        case block_character do
+          "#" -> put_in(acc[yPos][xPos], block_character)
+          "." -> acc
+        end
       end)
+    end)
+  end
+
+  def is_valid_position(board, block, offset) do
+    block
+    |> Matrix.all_points()
+    |> Enum.all?(fn %{x: x, y: y} ->
+      board_point = translate_point(%{x: x, y: y}, offset)
+
+      # IO.puts(
+      #   "board at " <>
+      #     inspect({board_point.x, board_point.y}) <>
+      #     " is " <> inspect(board[board_point.y][board_point.x])
+      # )
+
+      # IO.puts("block at " <> inspect({x, y}) <> " is " <> inspect(block[y][x]))
+
+      case board[board_point.y][board_point.x] do
+        # "." is an empty space
+        "." -> true
+        # if the block has an empty space, this is fine
+        _ -> block[y][x] != "#"
+      end
     end)
   end
 
@@ -332,8 +312,6 @@ defmodule Part1 do
         false -> x_shifted_offset
       end
 
-    # is_at_bottom =
-    #   not is_valid_position(board, block, %{x: xy_shifted_offset.x, y: xy_shifted_offset.y + 1})
     is_at_bottom = xy_shifted_offset == x_shifted_offset
 
     # IO.puts("is at bottom? " <> inspect(is_at_bottom))
@@ -351,44 +329,224 @@ defmodule Part1 do
     end
   end
 
-  def solve(jet_movements) do
-    num_turns = 2022
+  def add_block(board, block_num, jet_movements, jet_offset) do
+    # IO.puts(" ")
+    # IO.puts("  ----  ")
+    # IO.puts(" ")
+    block = Block.block(block_num)
+    block_plus_padding_height = Enum.count(block) + 3
 
+    padded_board =
+      board
+      |> add_empty_rows_to_top(block)
+
+    empty_row_count = num_empty_rows(padded_board)
+    starting_y_offset = empty_row_count - block_plus_padding_height
+
+    # IO.puts("in add_block, empty_rows: " <> inspect(empty_row_count))
+
+    block_offset = translate_point(@starting_block_offset, %{x: 0, y: starting_y_offset})
+
+    # padded_board
+    # |> place_block_on_board(block, block_offset)
+    # |> Matrix.print()
+
+    # IO.puts("+++++++++++++++")
+
+    # IO.puts("starting block offset is " <> inspect(block_offset))
+
+    {final_board, new_jet_offset} =
+      padded_board
+      |> position_block(block, block_offset, jet_movements, jet_offset)
+
+    # Matrix.print(final_board)
+    {final_board, new_jet_offset}
+  end
+
+  def effective_floor_depth(board) do
+    empty_row = new_empty_row()
+    filled_row = row("#")
+
+    board
+    |> Matrix.to_list()
+    |> Enum.reduce({empty_row, 0}, fn row, {columns, count} ->
+      # IO.puts("-----")
+      # IO.puts("count:" <> inspect(count))
+      # IO.puts("columns is " <> inspect(columns))
+      # IO.puts("row is " <> inspect(row))
+
+      cond do
+        columns == filled_row ->
+          {columns, count}
+
+        true ->
+          new_columns =
+            Enum.zip(columns, row)
+            |> Enum.map(fn {column_char, row_char} ->
+              case column_char do
+                # if the column has already been blocked, it stays that way.
+                "#" ->
+                  "#"
+
+                # if the column has not yet been blocked, check to see if the character
+                # in this row is a rock or the floor.
+                "." ->
+                  case row_char do
+                    "#" -> "#"
+                    "-" -> "#"
+                    "." -> column_char
+                  end
+              end
+            end)
+
+          {new_columns, count + 1}
+      end
+    end)
+    |> elem(1)
+  end
+
+  def solve(jet_movements, num_turns) do
     # starting board is just the floor
     starting_board =
       [floor_row()]
       |> Matrix.from_list()
 
-    final_matrix =
+    {ending_top_matrix, _, num_clipped} =
       0..(num_turns - 1)
-      |> Enum.reduce({starting_board, 0}, fn turn, {board, jet_offset} ->
-        add_block(board, turn, jet_movements, jet_offset)
-      end)
-      |> elem(0)
+      |> Enum.reduce({starting_board, 0, 0}, fn turn, {board, jet_offset, running_rows_clipped} ->
+        # put the next block on the board
+        {updated_board, updated_jet_offset} = add_block(board, turn, jet_movements, jet_offset)
 
-    empty_row_count = num_empty_rows(final_matrix)
-    Enum.count(final_matrix) - empty_row_count - 1
+        # As the board fills up, it becomes impossible to reach the bottom (i.e., every column
+        # has a rock between the top and the floor). We only care about the rows we can reach,
+        # `Enum.take` those.
+        necessary_matrix_height = effective_floor_depth(updated_board)
+        num_removed = Enum.count(updated_board) - necessary_matrix_height
+
+        # If we have an excess number of empty rows on the top, remove those.
+        to_drop = max(0, num_empty_rows(updated_board) - 3)
+
+        clipped_board =
+          updated_board
+          |> Matrix.to_list()
+          |> Enum.take(necessary_matrix_height)
+          |> Enum.drop(to_drop)
+          |> Matrix.from_list()
+
+        {
+          clipped_board,
+          updated_jet_offset,
+          running_rows_clipped + num_removed
+        }
+      end)
+
+    Enum.count(ending_top_matrix) + num_clipped - num_empty_rows(ending_top_matrix) - 1
   end
 end
 
-Part1.solve(test_input)
+Part1.solve(test_input, 2022)
 ```
 
 ```elixir
-Part1.solve(real_input)
+Part1.solve(real_input, 2022)
 ```
 
 ## Part 2
 
 ```elixir
 defmodule Part2 do
-  def solve(input) do
+  # After enough time running, we will start to see the board start to repeat.
+  # Once we determine how many turns a cycle is, we can do a little math to 
+  # determine how tall the blocks will be at incredibly high numbers.
+
+  def solve(jet_movements, num_turns, cycle_length, score_step) do
+    # starting board is just the floor
+    starting_board =
+      [Part1.floor_row()]
+      |> Matrix.from_list()
+
+    # NOTE: depending on the input to this function, you may need to set this to an arbitrarily
+    # high number to see the cycle_length emerge.
+    num_runs = cycle_length
+
+    {_, _, _, board_map} =
+      0..num_runs
+      |> Enum.reduce(
+        {starting_board, 0, 0, Map.new()},
+        fn turn, {board, jet_offset, running_rows_clipped, saved_boards} ->
+          current_score =
+            Enum.count(board) + running_rows_clipped - Part1.num_empty_rows(board) - 1
+
+          # Uncomment this to find the cycle length of the input
+          # 
+          # case Map.get(saved_boards, board) do
+          #   [{turn_a, score_a}, {turn_b, score_b} | _] ->
+          #     turn_step = turn_b - turn_a
+          #     score_step = score_b - score_a
+          #     IO.puts("turn step: " <> inspect(turn_step))
+          #     IO.puts("score step: " <> inspect(score_step))
+          #   _ ->
+          #     nil
+          # end
+
+          updated_boards =
+            Map.put(
+              saved_boards,
+              board,
+              Map.get(saved_boards, board, []) ++ [{turn, current_score}]
+            )
+
+          # put the next block on the board
+          {updated_board, updated_jet_offset} =
+            Part1.add_block(board, turn, jet_movements, jet_offset)
+
+          # As the board fills up, it becomes impossible to reach the bottom (i.e., every column
+          # has a rock between the top and the floor). We only care about the rows we can reach,
+          # `Enum.take` those.
+          necessary_matrix_height = Part1.effective_floor_depth(updated_board)
+          num_removed = Enum.count(updated_board) - necessary_matrix_height
+
+          # If we have an excess number of empty rows on the top, remove those.
+          to_drop = max(0, Part1.num_empty_rows(updated_board) - 3)
+
+          clipped_board =
+            updated_board
+            |> Matrix.to_list()
+            |> Enum.take(necessary_matrix_height)
+            |> Enum.drop(to_drop)
+            |> Matrix.from_list()
+
+          {
+            clipped_board,
+            updated_jet_offset,
+            running_rows_clipped + num_removed,
+            updated_boards
+          }
+        end
+      )
+
+    score_offset =
+      board_map
+      |> Map.values()
+      |> List.flatten()
+      |> Map.new()
+      |> Map.get(rem(num_turns, cycle_length))
+
+    div(num_turns - rem(num_turns, cycle_length), cycle_length) * score_step + score_offset
   end
 end
 
-Part2.solve(test_input)
+# Determined from stdout after running with arbitrary inputs for cycle_length and score_step
+cycle_length = 35
+score_step = 53
+
+Part2.solve(test_input, 1_000_000_000_000, cycle_length, score_step)
 ```
 
 ```elixir
-Part2.solve(real_input)
+# Determined from stdout after running with arbitrary inputs for cycle_length and score_step
+cycle_length = 1745
+score_step = 2783
+
+Part2.solve(real_input, 1_000_000_000_000, cycle_length, score_step)
 ```
