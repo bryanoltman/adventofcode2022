@@ -1,0 +1,186 @@
+# Day 18
+
+## Setup
+
+https://adventofcode.com/2022/day/18
+
+```elixir
+defmodule Load do
+  def input do
+    File.read!(Path.join(Path.absname(__DIR__), "input/18.txt"))
+  end
+end
+```
+
+```elixir
+defmodule Cube do
+  defstruct x: 0,
+            y: 0,
+            z: 0,
+            x_fwd: :exposed,
+            x_rev: :exposed,
+            y_fwd: :exposed,
+            y_rev: :exposed,
+            z_fwd: :exposed,
+            z_rev: :exposed
+
+  def new({x, y, z}) do
+    %Cube{x: x, y: y, z: z}
+  end
+
+  def coords(cube) do
+    {cube.x, cube.y, cube.z}
+  end
+
+  # The six faces of the cube
+  def neighbor_coords(cube) do
+    x = cube.x
+    y = cube.y
+    z = cube.z
+
+    %{
+      :x_fwd => {x + 1, y, z},
+      :x_rev => {x - 1, y, z},
+      :y_fwd => {x, y + 1, z},
+      :y_rev => {x, y - 1, z},
+      :z_fwd => {x, y, z + 1},
+      :z_rev => {x, y, z - 1}
+    }
+  end
+
+  def opposite_direction(direction) do
+    case direction do
+      :x_fwd -> :x_rev
+      :x_rev -> :x_fwd
+      :y_fwd -> :y_rev
+      :y_rev -> :y_fwd
+      :z_fwd -> :z_rev
+      :z_rev -> :z_fwd
+    end
+  end
+
+  def cover_direction(cube, direction) do
+    Map.put(cube, direction, :covered)
+  end
+
+  def exposed_sides(cube) do
+    [
+      cube.x_fwd,
+      cube.x_rev,
+      cube.y_fwd,
+      cube.y_rev,
+      cube.z_fwd,
+      cube.z_rev
+    ]
+    |> Enum.filter(fn side -> side == :exposed end)
+    |> Enum.count()
+  end
+end
+
+Cube.new({2, 2, 2})
+# |> Cube.neighbor_coords()
+|> Cube.exposed_sides()
+```
+
+```elixir
+defmodule Parse do
+  def input(input_str) do
+    input_str
+    |> String.split("\n", trim: true)
+    |> Enum.map(fn line ->
+      line
+      |> String.split(",", trim: true)
+      |> Enum.map(fn str -> elem(Integer.parse(str), 0) end)
+      |> List.to_tuple()
+    end)
+    |> Enum.map(&Cube.new(&1))
+    |> MapSet.new()
+  end
+end
+
+test_input =
+  """
+  2,2,2
+  1,2,2
+  3,2,2
+  2,1,2
+  2,3,2
+  2,2,1
+  2,2,3
+  2,2,4
+  2,2,6
+  1,2,5
+  3,2,5
+  2,1,5
+  2,3,5
+  """
+  |> Parse.input()
+```
+
+```elixir
+real_input =
+  Load.input()
+  |> Parse.input()
+```
+
+## Part 1
+
+```elixir
+defmodule Part1 do
+  def solve(cubes) do
+    cubes
+    |> Enum.reduce(%{}, fn cube, board ->
+      # board is map of x,y,z coords to cubes
+
+      neighbor_coords = Cube.neighbor_coords(cube)
+
+      {updated_board, placed_cube} =
+        neighbor_coords
+        |> Enum.reduce({board, cube}, fn {direction, coord}, {acc_board, acc_cube} ->
+          opposite_direction = Cube.opposite_direction(direction)
+
+          case acc_board[coord] do
+            nil ->
+              {acc_board, acc_cube}
+
+            neighbor_cube ->
+              # IO.puts("covering " <> inspect(opposite_direction) <> " of " <> inspect(neighbor_cube))
+              # IO.puts("covering " <> inspect(direction) <> " of " <> inspect(acc_cube))
+              {
+                acc_board
+                |> Map.put(coord, Cube.cover_direction(neighbor_cube, opposite_direction)),
+                Cube.cover_direction(acc_cube, direction)
+              }
+          end
+        end)
+
+      updated_board
+      |> Map.put(Cube.coords(placed_cube), placed_cube)
+    end)
+    |> Map.values()
+    |> Enum.map(fn cube -> Cube.exposed_sides(cube) end)
+    |> Enum.sum()
+  end
+end
+
+Part1.solve(test_input)
+```
+
+```elixir
+Part1.solve(real_input)
+```
+
+## Part 2
+
+```elixir
+defmodule Part2 do
+  def solve(cubes) do
+  end
+end
+
+Part2.solve(test_input)
+```
+
+```elixir
+Part2.solve(real_input)
+```
