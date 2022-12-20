@@ -174,7 +174,74 @@ Part1.solve(real_input)
 
 ```elixir
 defmodule Part2 do
+  def adjacent_coords({x, y, z}) do
+    [
+      {x + 1, y, z},
+      {x - 1, y, z},
+      {x, y + 1, z},
+      {x, y - 1, z},
+      {x, y, z + 1},
+      {x, y, z - 1}
+    ]
+  end
+
+  def edge_search(_, edge_count, _, _, _, _, []) do
+    edge_count
+  end
+
+  def edge_search(filled_coords, edge_count, visited, x_range, y_range, z_range, [curr | to_visit]) do
+    updated_visited = MapSet.put(visited, curr)
+
+    in_bounds_neighbors =
+      adjacent_coords(curr)
+      |> Enum.filter(fn {x, y, z} -> x in x_range and y in y_range and z in z_range end)
+
+    num_cube_neighbors =
+      in_bounds_neighbors
+      |> Enum.filter(fn coord -> MapSet.member?(filled_coords, coord) end)
+      |> Enum.count()
+
+    visitable_neighbors =
+      in_bounds_neighbors
+      |> Enum.reject(fn coord -> MapSet.member?(updated_visited, coord) end)
+      |> Enum.reject(fn coord -> MapSet.member?(filled_coords, coord) end)
+      |> Enum.reject(fn coord -> Enum.member?(to_visit, coord) end)
+
+    updated_to_visit = to_visit ++ visitable_neighbors
+
+    edge_search(
+      filled_coords,
+      edge_count + num_cube_neighbors,
+      updated_visited,
+      x_range,
+      y_range,
+      z_range,
+      updated_to_visit
+    )
+  end
+
   def solve(cubes) do
+    filled_coords =
+      cubes
+      |> Enum.map(fn cube -> {cube.x, cube.y, cube.z} end)
+      |> MapSet.new()
+
+    max_x = filled_coords |> Enum.map(&elem(&1, 0)) |> Enum.max()
+    max_y = filled_coords |> Enum.map(&elem(&1, 1)) |> Enum.max()
+    max_z = filled_coords |> Enum.map(&elem(&1, 2)) |> Enum.max()
+    min_x = filled_coords |> Enum.map(&elem(&1, 0)) |> Enum.min()
+    min_y = filled_coords |> Enum.map(&elem(&1, 1)) |> Enum.min()
+    min_z = filled_coords |> Enum.map(&elem(&1, 2)) |> Enum.min()
+
+    edge_search(
+      filled_coords,
+      0,
+      MapSet.new(),
+      (min_x - 1)..(max_x + 1),
+      (min_y - 1)..(max_y + 1),
+      (min_z - 1)..(max_z + 1),
+      [{min_x - 1, min_y - 1, min_z - 1}]
+    )
   end
 end
 
