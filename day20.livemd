@@ -1,0 +1,120 @@
+# Day 20
+
+## Setup
+
+https://adventofcode.com/2022/day/20
+
+```elixir
+defmodule Load do
+  def input do
+    File.read!(Path.join(Path.absname(__DIR__), "input/20.txt"))
+  end
+end
+```
+
+```elixir
+defmodule Parse do
+  def input(text) do
+    text
+    |> String.split("\n", trim: true)
+    |> Enum.map(&Integer.parse/1)
+    |> Enum.map(&elem(&1, 0))
+  end
+end
+
+test_input =
+  """
+  1
+  2
+  -3
+  3
+  -2
+  0
+  4
+  """
+  |> Parse.input()
+```
+
+```elixir
+real_input =
+  Load.input()
+  |> Parse.input()
+```
+
+## Part 1
+
+```elixir
+defmodule Part1 do
+  def mix(indexed_array) do
+    length = Enum.count(indexed_array)
+    indicies = 0..(length - 1)
+
+    indicies
+    |> Enum.reduce(indexed_array, fn orig_index, acc ->
+      current_index = acc |> Enum.find_index(fn {_, idx} -> idx == orig_index end)
+      {value, _} = Enum.at(acc, current_index)
+      move_size = Integer.mod(value, length - 1)
+      offset = if current_index + move_size >= length, do: 1, else: 0
+      new_index = Integer.mod(current_index + move_size, length) + offset
+
+      acc
+      |> List.delete_at(current_index)
+      |> List.insert_at(new_index, {value, orig_index})
+    end)
+  end
+
+  def solve(array) do
+    mixed =
+      array
+      |> Enum.with_index()
+      |> mix()
+      |> Enum.map(&elem(&1, 0))
+
+    zero_index = Enum.find_index(mixed, fn val -> val == 0 end)
+
+    [1000, 2000, 3000]
+    |> Enum.map(fn offset -> rem(zero_index + offset, Enum.count(mixed)) end)
+    |> Enum.map(fn idx -> Enum.at(mixed, idx) end)
+    |> Enum.sum()
+  end
+end
+
+Part1.solve(test_input)
+```
+
+```elixir
+Part1.solve(real_input)
+```
+
+## Part 2
+
+```elixir
+defmodule Part2 do
+  def solve(input) do
+    key = 811_589_153
+
+    adjusted_input =
+      input
+      |> Enum.map(fn val -> val * key end)
+      |> Enum.with_index()
+
+    mixed =
+      1..10
+      |> Enum.reduce(adjusted_input, fn _, acc -> Part1.mix(acc) end)
+      |> Enum.map(&elem(&1, 0))
+
+    zero_index = Enum.find_index(mixed, fn val -> val == 0 end)
+
+    [1000, 2000, 3000]
+    |> Enum.map(fn offset -> rem(zero_index + offset, Enum.count(mixed)) end)
+    |> Enum.map(fn idx -> Enum.at(mixed, idx) end)
+    |> Enum.sum()
+  end
+end
+
+Part2.solve(test_input)
+```
+
+```elixir
+Part2.solve(real_input)
+```
