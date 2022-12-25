@@ -1,0 +1,127 @@
+# Day 25
+
+## Setup
+
+https://adventofcode.com/2022/day/25
+
+```elixir
+defmodule Load do
+  def input do
+    File.read!(Path.join(Path.absname(__DIR__), "input/25.txt"))
+  end
+end
+```
+
+```elixir
+defmodule Parse do
+  def input(input_str) do
+    input_str
+    |> String.split("\n", trim: true)
+  end
+end
+
+test_input =
+  """
+  1=-0-2
+  12111
+  2=0=
+  21
+  2=01
+  111
+  20012
+  112
+  1=-1=
+  1-12
+  12
+  1=
+  122
+  """
+  |> Parse.input()
+```
+
+```elixir
+real_input =
+  Load.input()
+  |> Parse.input()
+```
+
+```elixir
+defmodule Day25 do
+  def snafu_to_dec(snafu) do
+    snafu
+    |> String.split("", trim: true)
+    |> Enum.map(fn char ->
+      case char do
+        "=" -> -2
+        "-" -> -1
+        "0" -> 0
+        "1" -> 1
+        "2" -> 2
+      end
+    end)
+    |> Enum.reverse()
+    |> Enum.reduce({0, 0}, fn int, {acc, pow} ->
+      {acc + int * :math.pow(5, pow), pow + 1}
+    end)
+    |> elem(0)
+    |> round
+  end
+
+  def dec_to_snafu(dec) do
+    offset = 0
+    base_5 = Integer.to_string(dec + offset, 5)
+
+    {snafu, carry} =
+      base_5
+      |> String.graphemes()
+      |> Enum.reverse()
+      |> Enum.reduce({"", 0}, fn dec_str, {acc, carry} ->
+        as_int = elem(Integer.parse(dec_str), 0)
+
+        next_carry =
+          cond do
+            as_int + carry > 2 -> 1
+            true -> 0
+          end
+
+        snafu_digit =
+          case as_int + carry do
+            0 -> "0"
+            1 -> "1"
+            2 -> "2"
+            3 -> "="
+            4 -> "-"
+            5 -> "0"
+          end
+
+        {snafu_digit <> acc, next_carry}
+      end)
+
+    if(carry > 0, do: "1", else: "") <> snafu
+  end
+end
+
+# Day25.dec_to_snafu(2022)
+# Day25.snafu_to_dec("1121-1110-1=0")
+# Day25.snafu_to_dec("1=11-2")
+Day25.dec_to_snafu(4890)
+```
+
+## Part 1
+
+```elixir
+defmodule Part1 do
+  def solve(input) do
+    input
+    |> Enum.map(&Day25.snafu_to_dec/1)
+    |> Enum.sum()
+    |> Day25.dec_to_snafu()
+  end
+end
+
+Part1.solve(test_input)
+```
+
+```elixir
+Part1.solve(real_input)
+```
