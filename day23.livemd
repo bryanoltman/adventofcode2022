@@ -1,0 +1,326 @@
+# Day 23
+
+## Setup
+
+https://adventofcode.com/2022/day/23
+
+```elixir
+# Taken from https://blog.danielberkompas.com/2016/04/23/multidimensional-arrays-in-elixir/
+defmodule Matrix do
+  @moduledoc """
+  Helpers for working with multidimensional lists, also called matrices.
+  """
+
+  @doc """
+  Converts a multidimensional list into a zero-indexed map.
+
+  ## Example
+
+      iex> list = [["x", "o", "x"]]
+      ...> Matrix.from_list(list)
+      %{0 => %{0 => "x", 1 => "o", 2 => "x"}}
+  """
+  def from_list(list) when is_list(list) do
+    do_from_list(list)
+  end
+
+  defp do_from_list(list, map \\ %{}, index \\ 0)
+  defp do_from_list([], map, _index), do: map
+
+  defp do_from_list([h | t], map, index) do
+    map = Map.put(map, index, do_from_list(h))
+    do_from_list(t, map, index + 1)
+  end
+
+  defp do_from_list(other, _, _), do: other
+
+  @doc """
+  Converts a zero-indexed map into a multidimensional list.
+
+  ## Example
+
+      iex> matrix = %{0 => %{0 => "x", 1 => "o", 2 => "x"}}
+      ...> Matrix.to_list(matrix)
+      [["x", "o", "x"]]
+  """
+  def to_list(matrix) when is_map(matrix) do
+    do_to_list(matrix)
+  end
+
+  defp do_to_list(matrix) when is_map(matrix) do
+    Enum.to_list(matrix)
+    |> Enum.sort_by(&elem(&1, 0))
+    |> Enum.map(fn x -> elem(x, 1) end)
+    |> Enum.map(fn x -> do_to_list(x) end)
+  end
+
+  defp do_to_list(other), do: other
+
+  def at(matrix, {x, y}), do: matrix[y][x]
+  def at(matrix, %{x: x, y: y}), do: matrix[y][x]
+
+  def contains_point(matrix, %{x: x, y: y}) do
+    y >= 0 and y < Enum.count(matrix) and x >= 0 and x < Enum.count(matrix[0])
+  end
+
+  def all_points(matrix) do
+    matrix
+    |> Enum.reduce([], fn {y, row}, acc ->
+      row_points =
+        row
+        |> Enum.map(&elem(&1, 0))
+        |> Enum.map(fn x -> %{x: x, y: y} end)
+
+      acc ++ row_points
+    end)
+  end
+
+  def neighbor_points(%{x: x, y: y}) do
+    for nx <- (x - 1)..(x + 1),
+        ny <- (y - 1)..(y + 1),
+        !(x == nx and y == ny),
+        do: %{x: nx, y: ny}
+  end
+
+  def put(matrix, %{x: x, y: y}, value) do
+    # IO.puts("inserting " <> inspect(value) <> " into " <> inspect({x, y}))
+    put_in(matrix[y][x], value)
+  end
+
+  def print(matrix) do
+    matrix
+    |> Map.keys()
+    |> Enum.reduce([], fn y, acc ->
+      row =
+        matrix[y]
+        |> Map.keys()
+        |> Enum.sort()
+        |> Enum.map(fn key -> matrix[y][key] end)
+        |> Enum.join()
+
+      acc ++ [row]
+    end)
+    |> Enum.each(&IO.inspect(&1))
+
+    matrix
+  end
+end
+
+Matrix.from_list([[1], [2], [3]])
+|> Matrix.put(%{x: 0, y: 0}, 10)
+```
+
+```elixir
+defmodule Load do
+  def input do
+    File.read!(Path.join(Path.absname(__DIR__), "input/23.txt"))
+  end
+end
+```
+
+```elixir
+defmodule Parse do
+  def input(input_str) do
+    input_str
+    |> String.split("\n", trim: true)
+    |> Enum.map(&String.split(&1, "", trim: true))
+    |> Matrix.from_list()
+  end
+end
+
+test_input =
+  """
+  ..............
+  ..............
+  .......#......
+  .....###.#....
+  ...#...#.#....
+  ....#...##....
+  ...#.###......
+  ...##.#.##....
+  ....#..#......
+  ..............
+  ..............
+  ..............
+  """
+  |> Parse.input()
+```
+
+```elixir
+real_input =
+  Load.input()
+  |> Parse.input()
+```
+
+## Part 1
+
+```elixir
+# If no Elf in the N, NE, or NW adjacent positions, north one step.
+# If no Elf in the S, SE, or SW adjacent positions, south one step.
+# If no Elf in the W, NW, or SW adjacent positions, west one step.
+# If no Elf in the E, NE, or SE adjacent positions, east one step.
+defmodule Part1 do
+  def has_neighbors?(point, matrix) do
+    has_neighbors_matching?(point, matrix, fn _ -> true end)
+  end
+
+  def has_neighbors_matching?(point, matrix, filter) do
+    Matrix.neighbor_points(point)
+    |> Enum.filter(fn point -> Matrix.contains_point(matrix, point) end)
+    |> Enum.filter(&filter.(&1))
+    |> Enum.any?(fn point -> Matrix.at(matrix, point) == "#" end)
+  end
+
+  def has_north_neighbors?(point, matrix) do
+    has_neighbors_matching?(point, matrix, fn %{x: _, y: ny} -> ny == point.y - 1 end)
+  end
+
+  def has_south_neighbors?(point, matrix) do
+    has_neighbors_matching?(point, matrix, fn %{x: _, y: ny} -> ny == point.y + 1 end)
+  end
+
+  def has_west_neighbors?(point, matrix) do
+    has_neighbors_matching?(point, matrix, fn %{x: nx, y: _} -> nx == point.x - 1 end)
+  end
+
+  def has_east_neighbors?(point, matrix) do
+    has_neighbors_matching?(point, matrix, fn %{x: nx, y: _} -> nx == point.x + 1 end)
+  end
+
+  def move_for_elf(point, matrix, pos_start_idx) do
+    cond do
+      not has_neighbors?(point, matrix) ->
+        point
+
+      true ->
+        neighbor_moves = [
+          {not has_north_neighbors?(point, matrix), %{x: point.x, y: point.y - 1}},
+          {not has_south_neighbors?(point, matrix), %{x: point.x, y: point.y + 1}},
+          {not has_west_neighbors?(point, matrix), %{x: point.x - 1, y: point.y}},
+          {not has_east_neighbors?(point, matrix), %{x: point.x + 1, y: point.y}}
+        ]
+
+        0..3
+        |> Enum.map(fn idx -> rem(idx + pos_start_idx, 4) end)
+        |> Enum.map(fn idx -> Enum.at(neighbor_moves, idx) end)
+        |> Enum.filter(fn {no_neighbors?, _} -> no_neighbors? end)
+        |> Enum.filter(fn {_, point} -> Matrix.contains_point(matrix, point) end)
+        |> case do
+          [] -> point
+          [{_, target} | _] -> target
+        end
+    end
+  end
+
+  def proposed_map(turn, matrix) do
+    matrix
+    |> elf_positions
+    |> Enum.reduce(%{}, fn point, acc ->
+      target = move_for_elf(point, matrix, turn)
+      # IO.puts("target for " <> inspect(point) <> " is " <> inspect(target))
+      sources = Map.get(acc, target, [])
+      Map.put(acc, target, sources ++ [point])
+    end)
+    |> Enum.reject(fn {_, sources} -> Enum.count(sources) > 1 end)
+    |> Enum.reduce(matrix, fn {target, [source]}, acc ->
+      # IO.puts("moving " <> inspect(source) <> " to " <> inspect(target))
+      acc
+      |> Matrix.put(source, ".")
+      |> Matrix.put(target, "#")
+    end)
+  end
+
+  def elf_positions(matrix) do
+    matrix
+    |> Matrix.all_points()
+    |> Enum.filter(fn point -> Matrix.at(matrix, point) == "#" end)
+  end
+
+  def transpose(rows), do: Enum.zip_with(rows, & &1)
+
+  def pad_matrix(matrix, padding) do
+    width = Enum.count(matrix[0])
+
+    vert_rows =
+      0..(padding - 1)
+      |> Enum.reduce([], fn _, acc ->
+        acc ++ [String.duplicate(".", padding * 2 + width) |> String.split("", trim: true)]
+      end)
+
+    horiz_padded =
+      matrix
+      |> Matrix.to_list()
+      |> Enum.map(fn row ->
+        p = String.duplicate(".", padding) |> String.split("", trim: true)
+        p ++ row ++ p
+      end)
+
+    (vert_rows ++ horiz_padded ++ vert_rows)
+    |> Matrix.from_list()
+  end
+
+  def trim_matrix(matrix) do
+    Matrix.to_list(matrix)
+    # Remove empty rows from the top
+    |> Enum.drop_while(fn row ->
+      Enum.all?(row, fn char -> char == "." end)
+    end)
+    # Flip, remove empty rows from the bottom
+    |> Enum.reverse()
+    |> Enum.drop_while(fn row ->
+      Enum.all?(row, fn char -> char == "." end)
+    end)
+    |> Enum.reverse()
+    |> transpose
+    # Transpose, remove empty rows from the side
+    |> Enum.drop_while(fn row ->
+      Enum.all?(row, fn char -> char == "." end)
+    end)
+    # Reverse, remove empty rows from the other side
+    |> Enum.reverse()
+    |> Enum.drop_while(fn row ->
+      Enum.all?(row, fn char -> char == "." end)
+    end)
+    # Re-reverse and re-transpose to put the matrix in its original orientation
+    |> Enum.reverse()
+    |> transpose
+    |> Matrix.from_list()
+  end
+
+  def solve(input) do
+    padded_input =
+      input
+      |> pad_matrix(200)
+
+    final_map =
+      0..9
+      |> Enum.reduce(padded_input, &proposed_map/2)
+      |> trim_matrix
+      |> Matrix.print()
+      |> Matrix.to_list()
+      |> List.flatten()
+      |> Enum.count(fn char -> char == "." end)
+  end
+end
+
+Part1.solve(test_input)
+```
+
+```elixir
+Part1.solve(real_input)
+```
+
+## Part 2
+
+```elixir
+defmodule Part2 do
+  def solve(input) do
+  end
+end
+
+Part2.solve(test_input)
+```
+
+```elixir
+Part2.solve(real_input)
+```
