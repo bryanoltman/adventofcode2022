@@ -292,14 +292,12 @@ defmodule Part1 do
       input
       |> pad_matrix(200)
 
-    final_map =
-      0..9
-      |> Enum.reduce(padded_input, &proposed_map/2)
-      |> trim_matrix
-      |> Matrix.print()
-      |> Matrix.to_list()
-      |> List.flatten()
-      |> Enum.count(fn char -> char == "." end)
+    0..9
+    |> Enum.reduce(padded_input, &proposed_map/2)
+    |> trim_matrix
+    |> Matrix.to_list()
+    |> List.flatten()
+    |> Enum.count(fn char -> char == "." end)
   end
 end
 
@@ -314,7 +312,20 @@ Part1.solve(real_input)
 
 ```elixir
 defmodule Part2 do
+  def do_turn(matrix, proposed_matrix, turn) when matrix == proposed_matrix do
+    turn
+  end
+
+  def do_turn(_, proposed_matrix, turn) do
+    do_turn(proposed_matrix, Part1.proposed_map(turn, proposed_matrix), turn + 1)
+  end
+
   def solve(input) do
+    padded_input =
+      input
+      |> Part1.pad_matrix(200)
+
+    do_turn(nil, padded_input, 0)
   end
 end
 
