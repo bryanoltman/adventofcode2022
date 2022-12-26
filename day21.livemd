@@ -99,11 +99,51 @@ Part1.solve(real_input)
 
 ```elixir
 defmodule Part2 do
+  def op_for_string(str) do
+    case str do
+      "+" -> fn x, y -> x + y end
+      "-" -> fn x, y -> x - y end
+      "/" -> fn x, y -> div(x, y) end
+      "*" -> fn x, y -> x * y end
+    end
+  end
+
+  def get_value(map, name, humn_val) do
+    case name do
+      "humn" ->
+        humn_val
+
+      _ ->
+        case map[name] do
+          {a, op, b} ->
+            op_for_string(op).(get_value(map, a, humn_val), get_value(map, b, humn_val))
+
+          int ->
+            int
+        end
+    end
+  end
+
   def solve(input) do
+    {a, _, b} = input["root"]
+
+    # use 0..1000 for test real_input
+    # This is not elegant in the slightest, but I printed the results of a brute-force
+    # approach to see if I could spot a trend, and once I did (in the real data, a_val
+    # decreases as the humn value incrases), I narrowed the brute forcing to that area
+    3_757_272_000_000..3_757_300_000_000
+    |> Enum.find(fn val ->
+      a_val = get_value(input, a, val)
+      b_val = get_value(input, b, val)
+
+      # IO.puts(inspect(val) <> ": " <> inspect(a_val) <> " " <> inspect(b_val))
+      a_val == b_val
+    end)
   end
 end
 
-Part2.solve(test_input)
+Part2.solve(real_input)
+# Part2.solve(test_input)
 ```
 
 ```elixir
