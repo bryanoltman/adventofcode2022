@@ -1,0 +1,111 @@
+# Day 21
+
+## Setup
+
+https://adventofcode.com/2022/day/21
+
+```elixir
+defmodule Load do
+  def input do
+    File.read!(Path.join(Path.absname(__DIR__), "input/21.txt"))
+  end
+end
+```
+
+```elixir
+defmodule Parse do
+  def parse_line(line) do
+    [name, value] =
+      line
+      |> String.split(": ")
+
+    val =
+      cond do
+        String.contains?(value, " ") -> value |> String.split(" ", trim: true) |> List.to_tuple()
+        true -> elem(Integer.parse(value), 0)
+      end
+
+    {name, val}
+  end
+
+  def input(input_str) do
+    input_str
+    |> String.split("\n", trim: true)
+    |> Enum.map(&parse_line/1)
+    |> Map.new()
+  end
+end
+
+test_input =
+  """
+  root: pppw + sjmn
+  dbpl: 5
+  cczh: sllz + lgvd
+  zczc: 2
+  ptdq: humn - dvpt
+  dvpt: 3
+  lfqf: 4
+  humn: 5
+  ljgn: 2
+  sjmn: drzm * dbpl
+  sllz: 4
+  pppw: cczh / lfqf
+  lgvd: ljgn * ptdq
+  drzm: hmdt - zczc
+  hmdt: 32
+  """
+  |> Parse.input()
+```
+
+```elixir
+real_input =
+  Load.input()
+  |> Parse.input()
+```
+
+## Part 1
+
+```elixir
+defmodule Part1 do
+  def op_for_string(str) do
+    case str do
+      "+" -> fn x, y -> x + y end
+      "-" -> fn x, y -> x - y end
+      "/" -> fn x, y -> div(x, y) end
+      "*" -> fn x, y -> x * y end
+    end
+  end
+
+  def get_value(map, name) do
+    case map[name] do
+      {a, op, b} -> op_for_string(op).(get_value(map, a), get_value(map, b))
+      int -> int
+    end
+  end
+
+  def solve(input) do
+    get_value(input, "root")
+  end
+end
+
+Part1.solve(test_input)
+```
+
+```elixir
+Part1.solve(real_input)
+```
+
+## Part 2
+
+```elixir
+defmodule Part2 do
+  def solve(input) do
+  end
+end
+
+Part2.solve(test_input)
+```
+
+```elixir
+Part2.solve(real_input)
+```
